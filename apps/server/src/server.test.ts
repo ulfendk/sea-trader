@@ -63,8 +63,10 @@ describe.runIf(available)('server', () => {
     const res = await fetch(`${BASE}/api/health`, { headers: { origin: 'https://example.github.io' } });
     expect(res.status).toBe(200);
     expect(res.headers.get('access-control-allow-origin')).toBe('https://example.github.io');
+    expect(res.headers.get('access-control-allow-credentials')).toBe('true');
     const bad = await fetch(`${BASE}/api/health`, { headers: { origin: 'https://evil.example' } });
     expect(bad.headers.get('access-control-allow-origin')).toBeNull();
+    expect(bad.headers.get('access-control-allow-credentials')).toBeNull();
   });
 
   it('rejects bad logins and non-admins', async () => {

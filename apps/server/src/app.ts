@@ -21,8 +21,13 @@ function configureCors() {
   delete (ctrl.DEFAULT_CORS_HEADERS as Record<string, string>)['Access-Control-Allow-Credentials'];
   ctrl.getCorsHeaders = (headers: Headers): Record<string, string> => {
     const origin = headers.get('origin');
+    // The Colyseus SDK sends matchmaking requests with credentials: 'include'.
     if (origin && (allowed.has(origin) || allowed.has('*')))
-      return { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' };
+      return {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
+        Vary: 'Origin',
+      };
     return { Vary: 'Origin' };
   };
 }
