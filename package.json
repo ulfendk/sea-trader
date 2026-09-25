@@ -1,0 +1,29 @@
+{
+  "name": "sea-trader",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "apps/server",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @sea-trader/shared && concurrently -n server,web \"npm run dev -w @sea-trader/server\" \"npm run dev -w @sea-trader/web\"",
+    "build": "npm run build -w @sea-trader/shared && npm run build -w @sea-trader/server && npm run build -w @sea-trader/web",
+    "typecheck": "npm run build -w @sea-trader/shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run build -w @sea-trader/shared && vitest run",
+    "lint": "prettier --check . && npm run typecheck",
+    "format": "prettier --write .",
+    "vapid": "node apps/server/scripts/vapid.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
