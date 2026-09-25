@@ -12,6 +12,8 @@ import {
   removePlayer,
   startGame,
   startTsOf,
+  applyStorms,
+  applyBrent,
   PORTS_BY_ID,
   type Command,
   type GameSettings,
@@ -21,7 +23,8 @@ import {
 import { userFromToken, type AuthUser } from '../auth.js';
 import { config } from '../config.js';
 import { handleNotices, isMember, liveRooms, loadGame, saveGame } from '../games.js';
-import { GameStateSchema, NewsItem, PlayerPub, ShipPub } from './schema.js';
+import { GameStateSchema, NewsItem, PlayerPub, ShipPub, StormPub } from './schema.js';
+import { feeds } from '../feeds.js';
 
 interface ClientData {
   userId: string;
@@ -41,6 +44,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   game!: GameState;
   clockTs = Date.now();
   private dirty = false;
+  private stormKey = '';
   private lastSave = Date.now();
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -64,6 +68,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     liveRooms.set(this.gameId, this);
     this.setState(new GameStateSchema());
     this.state.gameId = this.gameId;
+    this.applyFeeds(false);
     this.catchUp();
     this.sync();
     this.clock.setInterval(() => this.tick(), config.tickMs);
@@ -157,6 +162,21 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     s.fuelIndex = Math.round(g.market.fuelIndex * 1000) / 1000;
     s.shipIndex = Math.round(g.market.shipIndex * 1000) / 1000;
     s.winner = g.winner ?? '';
+    s.realWeather = !!g.settings.realWeather;
+    s.realFuel = !!g.settings.realFuel;
+    s.brent = g.market.brent ?? 0;
+    s.brentDate = g.market.brentDate ?? '';
+    const storms = g.storms ?? [];
+    const key = storms.map((st) => `${st.id}:${st.lon}:${st.lat}:${st.radiusNm}`).join('|');
+    if (key !== this.stormKey) {
+      this.stormKey = key;
+      s.storms.clear();
+      for (const st of storms) {
+        const p = new StormPub();
+        Object.assign(p, st);
+        s.storms.push(p);
+      }
+    }
 
     const ranks = rankings(g);
     for (const r of ranks) {
@@ -277,9 +297,20 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     await this.save();
   }
 
+  /** Copies the latest real-world storms and Brent price into the game. */
+  applyFeeds(broadcast = true) {
+    applyStorms(this.game, feeds.storms);
+    if (feeds.brent && feeds.brentDate) applyBrent(this.game, feeds.brent, feeds.brentDate);
+    if (broadcast) {
+      this.scheduleSave();
+      this.afterChange([]);
+    }
+  }
+
   async updateSettings(settings: Partial<GameSettings>, name?: string) {
     this.catchUp();
     Object.assign(this.game.settings, settings);
+    this.applyFeeds(false);
     if (name) this.gameName = name;
     this.afterChange([]);
     await this.save();

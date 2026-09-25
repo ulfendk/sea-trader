@@ -228,6 +228,23 @@ function Decision({ ship }: { ship: Ship }) {
           </div>
         </>
       )}
+      {d.kind === 'weather' && (
+        <>
+          <p style={{ margin: '0 0 6px' }}>
+            🌀 <b>{ship.name}</b> is heading into <b>{d.stormName}</b>
+            {d.severity === 'red' ? ', a very dangerous storm' : ', a severe storm'}. Sail straight through
+            (damage and some delay) or go around (+{d.detourDays} days)?
+          </p>
+          <div class="row">
+            <button class="danger" onClick={() => choose('through')}>
+              Sail through
+            </button>
+            <button class="primary" onClick={() => choose('around')}>
+              Go around
+            </button>
+          </div>
+        </>
+      )}
       {d.kind === 'distress' && (
         <>
           <p style={{ margin: '0 0 6px' }}>

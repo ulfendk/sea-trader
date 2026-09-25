@@ -31,6 +31,7 @@ import {
   userNames,
 } from './games.js';
 import { vapidPublicKey } from './push.js';
+import { feeds } from './feeds.js';
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
 const h = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
@@ -87,6 +88,8 @@ function cleanSettings(input: unknown): Partial<GameSettings> {
   num('durationDays', 0, 365 * 100);
   num('eventRate', 0, 10);
   num('interestRate', 0, 1);
+  for (const k of ['realWeather', 'realFuel'] as const)
+    if (typeof src[k] === 'boolean') out[k] = src[k] as boolean;
   return out;
 }
 
@@ -370,6 +373,16 @@ export function apiRouter(): Router {
         rooms: [...liveRooms.values()].map((r) => r.info()),
         users,
         defaults: DEFAULT_SETTINGS,
+        feeds: {
+          storms: feeds.storms,
+          stormsAt: feeds.stormsAt,
+          stormsError: feeds.stormsError,
+          brent: feeds.brent,
+          brentDate: feeds.brentDate,
+          brentAt: feeds.brentAt,
+          brentError: feeds.brentError,
+          enabled: config.feedsEnabled,
+        },
       });
     }),
   );

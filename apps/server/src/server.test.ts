@@ -10,6 +10,19 @@ process.env.TICK_MS = '200';
 process.env.CORS_ORIGINS = 'https://example.github.io';
 
 const PORT = 25671;
+
+// Local stand-ins for the real-world feeds (GDACS storms and EIA Brent price).
+const FEED_PORT = 25672;
+const http = await import('node:http');
+const fs = await import('node:fs');
+const feedServer = http.createServer((req, res) => {
+  const file = req.url?.startsWith('/storms') ? 'gdacs-tc.json' : 'eia-brent.json';
+  res.setHeader('content-type', 'application/json');
+  res.end(fs.readFileSync(new URL(`./__fixtures__/${file}`, import.meta.url)));
+});
+await new Promise<void>((r) => feedServer.listen(FEED_PORT, r));
+process.env.STORM_FEED_URL = `http://localhost:${FEED_PORT}/storms`;
+process.env.BRENT_FEED_URL = `http://localhost:${FEED_PORT}/brent`;
 const BASE = `http://localhost:${PORT}`;
 
 let available = true;
@@ -57,6 +70,7 @@ describe.runIf(available)('server', () => {
     await close?.();
     const { pool } = await import('./db/index.js');
     await pool.end();
+    feedServer.close();
   });
 
   it('health and CORS', async () => {
@@ -195,6 +209,35 @@ describe.runIf(available)('server', () => {
     expect(old.time).toBe(clockTs);
     const { loadGame } = await import('./games.js');
     expect(((await loadGame(row.id))!.state as any).startTs).toBe(clockTs - 100 * 86_400_000);
+  });
+
+  it('brings real storms and Brent prices into games that use them', async () => {
+    const overview = (await j<any>('GET', '/admin/overview', undefined, adminToken)).data;
+    expect(overview.feeds.storms.map((s: any) => s.name).sort()).toEqual([
+      'Cyclone Helene',
+      'Cyclone Kong-rey',
+    ]);
+    expect(overview.feeds.brent).toBe(82.47);
+    const on = await j<{ id: string }>(
+      'POST',
+      '/admin/games',
+      { name: 'Real world', settings: {} },
+      adminToken,
+    );
+    const off = await j<{ id: string }>(
+      'POST',
+      '/admin/games',
+      { name: 'Simulated', settings: { realWeather: false, realFuel: false } },
+      adminToken,
+    );
+    const { liveRooms } = await import('./games.js');
+    const real = liveRooms.get(on.data.id)!.game;
+    const sim = liveRooms.get(off.data.id)!.game;
+    expect(real.storms?.length).toBe(2);
+    expect(real.market.brent).toBe(82.47);
+    expect(real.market.fuelIndex).toBeCloseTo(82.47 / 75);
+    expect(sim.storms ?? []).toEqual([]);
+    expect(sim.market.fuelIndex).toBe(1);
   });
 
   it('persists game state', async () => {

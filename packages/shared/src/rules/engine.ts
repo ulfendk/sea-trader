@@ -1,6 +1,6 @@
 import { HAZARD_ZONES, PIRATE_ZONES, PORTS, getPort } from '../data/ports.js';
 import { SHIP_CLASSES, getShipClass, SHIP_CLASSES_BY_ID } from '../data/ships.js';
-import { findRoute, pointAlong, type Route } from '../geo.js';
+import { findRoute, haversineNm, pointAlong, type Route } from '../geo.js';
 import { simulateHarbor } from '../minigame/harbor.js';
 import { simulateReef } from '../minigame/reef.js';
 import { hashParts, Rng } from '../rng.js';
@@ -15,6 +15,7 @@ import {
   type PendingDecision,
   type PlayerState,
   type Ship,
+  type Storm,
   type UsedShipListing,
   type VoyageEvent,
 } from '../types.js';
@@ -182,7 +183,8 @@ function scheduleEvents(ctx: Ctx, ship: Ship, route: Route, speed: number): Voya
   const d = route.distance;
   const at = () => Math.round(rng.range(0.08, 0.92) * d);
   const seed = () => Math.floor(rng.next() * 2 ** 31);
-  const storms = (d / 10000) * rate;
+  // With real weather on, most storms come from the live feed instead.
+  const storms = (d / 10000) * rate * (s.settings.realWeather ? 0.3 : 1);
   for (let k = 0; k < 3; k++)
     if (rng.chance(Math.min(0.6, storms / (k + 1)))) events.push({ kind: 'storm', atNm: at(), seed: seed() });
   if (rng.chance((0.04 + (100 - ship.condition) / 250) * rate))
@@ -540,6 +542,22 @@ function resolve(ctx: Ctx, ship: Ship, choice: string, inputs?: number[]): Comma
       } else return { ok: false, error: 'Invalid choice' };
       break;
     }
+    case 'weather': {
+      const name = p.stormName ?? 'the storm';
+      if (choice === 'through') {
+        const rng = new Rng(p.seed);
+        const red = p.severity === 'red';
+        const dmg = Math.round(rng.range(red ? 8 : 4, red ? 18 : 10));
+        const delay = Math.round(rng.range(red ? 1 : 0.5, red ? 2 : 1.5) * 10) / 10;
+        damage(ship, dmg);
+        hold(ship, s.day, delay);
+        log(`${ship.name} fought her way through ${name}: ${dmg}% damage, ${delay} days lost.`, 'bad');
+      } else if (choice === 'around') {
+        hold(ship, s.day, p.detourDays ?? 1);
+        log(`${ship.name} steered around ${name} (+${p.detourDays} days).`, 'info');
+      } else return { ok: false, error: 'Invalid choice' };
+      break;
+    }
   }
   void cls;
   ship.pending = null;
@@ -551,7 +569,44 @@ const DEFAULT_CHOICE: Record<PendingDecision['kind'], string> = {
   pirates: 'pay',
   hazard: 'detour',
   distress: 'ignore',
+  weather: 'around',
 };
+
+// ---------------------------------------------------------------- real-world feeds
+
+/** Brent price (USD/bbl) at which bunker prices are at their base level (fuel index 1). */
+export const BASE_BRENT = 75;
+
+/** Replaces the game's list of real storms (from the weather feed). */
+export function applyStorms(state: GameState, storms: Storm[]) {
+  state.storms = state.settings.realWeather ? storms.map((st) => ({ ...st })) : [];
+}
+
+/** Records the latest real Brent price; the fuel index follows it at the next daily update. */
+export function applyBrent(state: GameState, usd: number, date: string) {
+  if (!(usd > 0)) return;
+  state.market.brent = usd;
+  state.market.brentDate = date;
+  if (state.settings.realFuel) state.market.fuelIndex = brentFuelIndex(usd);
+}
+
+export function brentFuelIndex(usd: number): number {
+  return Math.min(3, Math.max(0.4, usd / BASE_BRENT));
+}
+
+/** The first real storm (not yet met this voyage) whose danger area contains the ship. */
+function stormAt(state: GameState, ship: Ship): Storm | null {
+  const storms = state.storms;
+  if (!storms?.length || !state.settings.realWeather || !ship.voyage) return null;
+  const route = shipRoute(ship);
+  if (!route) return null;
+  const pos = pointAlong(route, ship.voyage.progressNm);
+  for (const st of storms) {
+    if (ship.voyage.stormsMet?.includes(st.id)) continue;
+    if (haversineNm(pos.lon, pos.lat, st.lon, st.lat) <= st.radiusNm) return st;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------- time
 
@@ -584,11 +639,12 @@ function daily(ctx: Ctx) {
   // Markets: mean-reverting random walks.
   const walk = (v: number, vol: number, lo: number, hi: number) =>
     Math.min(hi, Math.max(lo, v * Math.exp((rng.next() - 0.5) * 2 * vol + (1 - v) * 0.02)));
-  s.market.fuelIndex = walk(s.market.fuelIndex, 0.025, 0.5, 2.2);
+  const realFuel = !!(s.settings.realFuel && s.market.brent);
+  s.market.fuelIndex = realFuel ? brentFuelIndex(s.market.brent!) : walk(s.market.fuelIndex, 0.025, 0.5, 2.2);
   s.market.shipIndex = walk(s.market.shipIndex, 0.01, 0.6, 1.6);
   for (const t of Object.keys(s.market.freight) as (keyof typeof s.market.freight)[])
     s.market.freight[t] = walk(s.market.freight[t], 0.02, 0.6, 1.8);
-  if (rng.chance(0.004)) {
+  if (!realFuel && rng.chance(0.004)) {
     s.market.fuelIndex = Math.min(2.2, s.market.fuelIndex * 1.35);
     ctx.log({ player: null, text: 'OIL CRISIS! Bunker prices soar worldwide.', kind: 'bad' });
   }
@@ -639,6 +695,28 @@ function stepShip(ctx: Ctx, ship: Ship, dt: number) {
       ship.fuel = Math.max(0, ship.fuel - fuelPerDay(cls, v.speed) * dt);
       v.progressNm = Math.min(v.distance, v.progressNm + move);
       ship.condition = Math.max(1, ship.condition - 0.05 * dt * (1 + shipAgeYears(ship, s.day) / 20));
+      const storm = stormAt(s, ship);
+      if (storm) {
+        (v.stormsMet ??= []).push(storm.id);
+        const rng = new Rng(hashParts(s.seed, ship.id, storm.id));
+        const detourDays =
+          Math.round(rng.range(storm.severity === 'red' ? 2 : 1, storm.severity === 'red' ? 3.5 : 2) * 10) /
+          10;
+        raise(
+          ctx,
+          ship,
+          {
+            kind: 'weather',
+            stormId: storm.id,
+            stormName: storm.name,
+            severity: storm.severity,
+            detourDays,
+            seed: rng.int(1, 2 ** 30),
+          },
+          `${ship.name} is running into ${storm.name}${storm.windKmh ? ` (winds ${Math.round(storm.windKmh)} km/h)` : ''}. Sail through or go around (+${detourDays} days)?`,
+        );
+        return;
+      }
       for (const ev of v.events) {
         if (ev.fired || ev.atNm > v.progressNm) continue;
         ev.fired = true;
@@ -1023,6 +1101,7 @@ export function pendingActions(state: GameState, playerId: string): PendingActio
         pirates: 'is under pirate threat',
         hazard: 'needs a navigation decision',
         distress: 'received a distress call',
+        weather: 'is heading into a storm',
       };
       out.push({
         shipId: ship.id,

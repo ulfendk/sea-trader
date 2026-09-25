@@ -39,6 +39,18 @@ function nightPolygon(ts: number): Feature {
   return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } };
 }
 
+/** Circle of `radiusNm` around a point, as a polygon (good enough away from the poles). */
+function circlePolygon(lon: number, lat: number, radiusNm: number, props: Record<string, unknown>): Feature {
+  const dLat = radiusNm / 60;
+  const dLon = dLat / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+  const ring: [number, number][] = [];
+  for (let i = 0; i <= 48; i++) {
+    const a = (i / 48) * Math.PI * 2;
+    ring.push([lon + Math.cos(a) * dLon, Math.max(-85, Math.min(85, lat + Math.sin(a) * dLat))]);
+  }
+  return { type: 'Feature', properties: props, geometry: { type: 'Polygon', coordinates: [ring] } };
+}
+
 /**
  * The world map drawn on a modern, zoomable street map (MapLibre GL + OpenFreeMap).
  * Same props as the pixel `WorldMap`; game data is drawn as GeoJSON layers on top.
@@ -116,6 +128,7 @@ export function ModernMap({
           { animate: false, padding: 0 },
         );
         map.addSource('night', { type: 'geojson', data: fc([]) });
+        map.addSource('storms', { type: 'geojson', data: fc([]) });
         map.addSource('route', { type: 'geojson', data: fc([]) });
         map.addSource('ports', { type: 'geojson', data: fc([]) });
         map.addSource('ships', { type: 'geojson', data: fc([]) });
@@ -124,6 +137,25 @@ export function ModernMap({
           type: 'fill',
           source: 'night',
           paint: { 'fill-color': '#04081f', 'fill-opacity': 0.28 },
+        });
+        map.addLayer({
+          id: 'storms-fill',
+          type: 'fill',
+          source: 'storms',
+          paint: {
+            'fill-color': ['case', ['==', ['get', 'severity'], 'red'], '#c83030', '#f09628'],
+            'fill-opacity': 0.3,
+          },
+        });
+        map.addLayer({
+          id: 'storms-line',
+          type: 'line',
+          source: 'storms',
+          paint: {
+            'line-color': ['case', ['==', ['get', 'severity'], 'red'], '#c83030', '#f09628'],
+            'line-width': 2,
+            'line-dasharray': [3, 2],
+          },
         });
         map.addLayer({
           id: 'route',
@@ -177,19 +209,20 @@ export function ModernMap({
           },
         });
 
+        const rank = (id: string) => (id === 'ships' ? 0 : id === 'ports' ? 1 : 2);
         const pick = (e: MapMouseEvent) =>
           map
-            .queryRenderedFeatures(e.point, { layers: ['ships', 'ports'] })
+            .queryRenderedFeatures(e.point, { layers: ['ships', 'ports', 'storms-fill'] })
             .sort(
               (a: { layer: { id: string } }, b: { layer: { id: string } }) =>
-                (a.layer.id === 'ships' ? -1 : 1) - (b.layer.id === 'ships' ? -1 : 1),
+                rank(a.layer.id) - rank(b.layer.id),
             )[0];
         map.on('click', (e: MapMouseEvent) => {
           const f = pick(e);
           if (!f) return;
           const id = String(f.properties?.id);
           if (f.layer.id === 'ships') props.current.onSelectShip(id);
-          else props.current.onSelectPort?.(id);
+          else if (f.layer.id === 'ports') props.current.onSelectPort?.(id);
         });
         map.on('mousemove', (e: MapMouseEvent) => {
           const f = pick(e);
@@ -219,6 +252,17 @@ export function ModernMap({
             ),
           );
           if (!p) return;
+          (map.getSource('storms') as GeoJSONSource).setData(
+            fc(
+              (p.storms ?? []).map((st) =>
+                circlePolygon(st.lon, st.lat, st.radiusNm, {
+                  id: st.id,
+                  severity: st.severity,
+                  label: `🌀 ${st.name}${st.windKmh ? ` · ${st.windKmh} km/h` : ''}`,
+                }),
+              ),
+            ),
+          );
           const day = liveDay();
           const ships = Object.values(p.ships).sort(
             (a, b) =>

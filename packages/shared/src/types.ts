@@ -17,6 +17,10 @@ export interface GameSettings {
   eventRate: number;
   /** Annual loan interest rate (0.08 = 8%). */
   interestRate: number;
+  /** Put real severe storms (GDACS alerts) in ships' way. Missing on older games = off. */
+  realWeather?: boolean;
+  /** Drive bunker prices from the real Brent crude price. Missing on older games = off. */
+  realFuel?: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -27,7 +31,22 @@ export const DEFAULT_SETTINGS: GameSettings = {
   durationDays: 0,
   eventRate: 1,
   interestRate: 0.08,
+  realWeather: true,
+  realFuel: true,
 };
+
+/** A real severe storm (tropical cyclone) from the weather feed. */
+export interface Storm {
+  id: string;
+  name: string;
+  lon: number;
+  lat: number;
+  /** Radius (nm) of the area ships treat as dangerous. */
+  radiusNm: number;
+  severity: 'orange' | 'red';
+  /** Maximum sustained wind (km/h), if known. */
+  windKmh: number;
+}
 
 export interface PlayerState {
   id: string;
@@ -97,9 +116,11 @@ export interface Voyage {
   holdUntil: number;
   events: VoyageEvent[];
   canals: string[];
+  /** Real storms already met on this voyage (each is faced once). */
+  stormsMet?: string[];
 }
 
-export type DecisionKind = 'pilot' | 'pirates' | 'hazard' | 'distress';
+export type DecisionKind = 'pilot' | 'pirates' | 'hazard' | 'distress' | 'weather';
 
 export interface PendingDecision {
   kind: DecisionKind;
@@ -114,6 +135,10 @@ export interface PendingDecision {
   detourDays?: number;
   place?: string;
   tugFee?: number;
+  /** Real storm the ship is facing (weather decisions). */
+  stormId?: string;
+  stormName?: string;
+  severity?: 'orange' | 'red';
 }
 
 export interface Ship {
@@ -159,6 +184,9 @@ export interface LogEntry {
 
 export interface Market {
   fuelIndex: number;
+  /** Latest real Brent crude price (USD/bbl) and its date, when the fuel feed is available. */
+  brent?: number;
+  brentDate?: string;
   shipIndex: number;
   freight: Record<CargoType, number>;
 }
@@ -182,6 +210,8 @@ export interface GameState {
   nextId: number;
   log: LogEntry[];
   winner?: string | null;
+  /** Current real severe storms (set by the server's weather feed). */
+  storms?: Storm[];
 }
 
 /** Notice produced by the rules engine for the server to forward (push, status bar, feed). */

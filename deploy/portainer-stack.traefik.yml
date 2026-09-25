@@ -15,6 +15,9 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       TRUST_PROXY: '1'
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      # Free key from https://www.eia.gov/opendata/ for real Brent fuel prices (optional).
+      EIA_API_KEY: ${EIA_API_KEY:-}
+      FEEDS_ENABLED: ${FEEDS_ENABLED:-true}
     networks: [default, proxy]
     labels:
       - traefik.enable=true

@@ -86,9 +86,17 @@ export function Game({ id }: { id: string }) {
             </span>
           </>
         )}
-        <span class="stat hide-sm">
+        <span
+          class="stat hide-sm"
+          title={
+            p.realFuel && p.brent
+              ? `Bunker prices follow Brent crude: $${p.brent.toFixed(2)}/bbl on ${p.brentDate}`
+              : 'Simulated fuel market'
+          }
+        >
           <b>FUEL IDX</b>
           {p.fuelIndex.toFixed(2)}
+          {p.realFuel && p.brent ? <span class="muted"> (Brent ${p.brent.toFixed(0)})</span> : null}
         </span>
         {p.status !== 'running' && (
           <span class="badge calm">{p.status === 'lobby' ? 'NOT STARTED' : p.status.toUpperCase()}</span>

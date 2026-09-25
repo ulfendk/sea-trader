@@ -12,6 +12,8 @@ and pirates, and steer ships into harbour yourself to save the tug fee. Time run
 - **Admin panel.** Create and configure games (time scale, starting cash, deadlines, length), invite
   players with links, and manage users.
 - **Pixel look** that nods to the original: bitmap fonts, bevelled windows, and a 1° pixel world map.
+- **Real weather and fuel prices.** Live severe storms (GDACS) show up on the map and block routes, and bunker
+  prices can follow the real Brent crude price (free EIA key). Switchable per game.
 - **Modern map option.** Players can switch to a zoomable street map (OpenStreetMap data via OpenFreeMap, no API key) per device, in Settings or from the map's title bar.
 
 ## Architecture

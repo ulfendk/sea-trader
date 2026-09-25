@@ -40,13 +40,66 @@ interface Invite {
   expiresAt: string | null;
 }
 
-const SETTING_FIELDS: [keyof GameSettings, string, string][] = [
+type NumericSetting = Exclude<keyof GameSettings, 'startYear' | 'realWeather' | 'realFuel'>;
+
+interface Overview {
+  uptime: number;
+  users: number;
+  rooms: unknown[];
+  feeds?: {
+    enabled: boolean;
+    storms: { name: string; severity: string; windKmh: number }[];
+    stormsAt: number | null;
+    stormsError: string | null;
+    brent: number | null;
+    brentDate: string | null;
+    brentAt: number | null;
+    brentError: string | null;
+  };
+}
+
+/** Live-data feed status, so the admin can see whether real weather and prices are arriving. */
+function FeedStatus({ feeds }: { feeds: NonNullable<Overview['feeds']> }) {
+  const when = (ts: number | null) => (ts ? new Date(ts).toLocaleString() : 'never');
+  if (!feeds.enabled)
+    return <p class="small-text muted">Live data feeds are disabled (FEEDS_ENABLED=false).</p>;
+  return (
+    <div class="small-text kv">
+      <span>Storms</span>
+      <span>
+        {feeds.stormsError ? (
+          <span class="bad">error: {feeds.stormsError}</span>
+        ) : (
+          <>
+            {feeds.storms.length
+              ? feeds.storms.map((s) => `${s.name} (${s.severity}, ${s.windKmh} km/h)`).join(', ')
+              : 'no severe storms right now'}
+          </>
+        )}{' '}
+        · updated {when(feeds.stormsAt)}
+      </span>
+      <span>Brent</span>
+      <span>
+        {feeds.brentError ? (
+          <span class="bad">error: {feeds.brentError}</span>
+        ) : feeds.brent ? (
+          `$${feeds.brent.toFixed(2)}/bbl on ${feeds.brentDate}`
+        ) : (
+          'no data yet'
+        )}{' '}
+        · updated {when(feeds.brentAt)}
+      </span>
+    </div>
+  );
+}
+
+const SETTING_FIELDS: [NumericSetting, string, string][] = [
   [
     'timeScale',
     'Time scale (game days per real day)',
     '1 = real time. Use e.g. 1440 (1 day/min) for testing.',
   ],
-  ['startingCash', 'Starting cash ($)', ''],
+  ['startingCash', 'Starting cash (€)', ''],
   ['maxPlayers', 'Max players', ''],
   ['actionDeadlineHours', 'Decision deadline (game hours)', 'Default choice is applied after this.'],
   ['durationDays', 'Game length (game days, 0 = endless)', ''],
@@ -59,7 +112,7 @@ export function Admin() {
   const [games, setGames] = useState<AdminGame[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
-  const [overview, setOverview] = useState<{ uptime: number; users: number; rooms: unknown[] } | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
 
   const load = async () => {
     try {
@@ -67,7 +120,7 @@ export function Admin() {
         api<AdminGame[]>('GET', '/admin/games'),
         api<AdminUser[]>('GET', '/admin/users'),
         api<Invite[]>('GET', '/admin/invites'),
-        api<{ uptime: number; users: number; rooms: unknown[] }>('GET', '/admin/overview'),
+        api<Overview>('GET', '/admin/overview'),
       ]);
       setGames(g);
       setUsers(u);
@@ -117,6 +170,14 @@ export function Admin() {
           value={tab}
           onChange={setTab}
         />
+        {tab === 'games' && overview?.feeds && (
+          <div class="win dark" style={{ marginBottom: '14px' }}>
+            <div class="title">Live data</div>
+            <div class="body">
+              <FeedStatus feeds={overview.feeds} />
+            </div>
+          </div>
+        )}
         {tab === 'games' && <GamesTab games={games} users={users} act={act} />}
         {tab === 'users' && <UsersTab users={users} act={act} />}
         {tab === 'invites' && <InvitesTab invites={invites} games={games} act={act} />}
@@ -357,22 +418,40 @@ function SettingsForm({
   onChange,
 }: {
   value: GameSettings;
-  onChange: (k: keyof GameSettings, v: number) => void;
+  onChange: (k: keyof GameSettings, v: number | boolean) => void;
 }) {
   return (
-    <div class="cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
-      {SETTING_FIELDS.map(([k, label, hint]) => (
-        <label key={k}>
-          <span class="small-text">{label}</span>
-          <input
-            type="number"
-            step="any"
-            value={value[k]}
-            onInput={(e) => onChange(k, Number(e.currentTarget.value))}
-          />
-          {hint && <span class="small-text muted">{hint}</span>}
-        </label>
-      ))}
+    <div class="col">
+      <div class="cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+        {SETTING_FIELDS.map(([k, label, hint]) => (
+          <label key={k}>
+            <span class="small-text">{label}</span>
+            <input
+              type="number"
+              step="any"
+              value={value[k]}
+              onInput={(e) => onChange(k, Number(e.currentTarget.value))}
+            />
+            {hint && <span class="small-text muted">{hint}</span>}
+          </label>
+        ))}
+      </div>
+      <label class="row">
+        <input
+          type="checkbox"
+          checked={!!value.realWeather}
+          onChange={(e) => onChange('realWeather', e.currentTarget.checked)}
+        />
+        Real weather: severe storms from live alerts appear on the map and block routes
+      </label>
+      <label class="row">
+        <input
+          type="checkbox"
+          checked={!!value.realFuel}
+          onChange={(e) => onChange('realFuel', e.currentTarget.checked)}
+        />
+        Real fuel prices: bunker prices follow the live Brent crude price
+      </label>
     </div>
   );
 }

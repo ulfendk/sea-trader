@@ -62,9 +62,9 @@ export function subsolarPoint(ts: number): { lon: number; lat: number } {
 export function formatMoney(n: number): string {
   const sign = n < 0 ? '-' : '';
   const a = Math.abs(n);
-  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `${sign}$${(a / 1e3).toFixed(0)}k`;
-  return `${sign}$${Math.round(a)}`;
+  if (a >= 1e6) return `${sign}€${(a / 1e6).toFixed(2)}M`;
+  if (a >= 1e3) return `${sign}€${(a / 1e3).toFixed(0)}k`;
+  return `${sign}€${Math.round(a)}`;
 }
 
 export const routeOptsFor = (cls: ShipClass): RouteOptions => ({

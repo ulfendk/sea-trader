@@ -10,20 +10,22 @@ Either way you need the server container, Postgres, and HTTPS in front (see [rev
 
 ## Environment variables
 
-| Variable                                 | Default                                        | Purpose                                                                                                                         |
-| ---------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                           | `postgres://postgres@localhost:5432/seatrader` | Postgres connection. The stack files build it from `POSTGRES_*`.                                                                |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD`      | –                                              | Creates (or promotes) this admin account on start.                                                                              |
-| `PUBLIC_URL`                             | `http://localhost:5173`                        | Public URL of the web app. Used in push notification links and allowed for CORS.                                                |
-| `CORS_ORIGINS`                           | –                                              | Extra comma-separated browser origins allowed to call the server (for example your GitHub Pages origin). `*` allows any origin. |
-| `TRUST_PROXY`                            | –                                              | Set to `1` behind a reverse proxy.                                                                                              |
-| `SERVE_WEB`                              | `true`                                         | Serve the bundled web app. Set to `false` for an API-only server.                                                               |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | generated                                      | Web Push keys. If you leave them empty, a pair is generated once and stored in the database. `npm run vapid` prints a new pair. |
-| `VAPID_SUBJECT`                          | `mailto:admin@example.com`                     | Contact address for push services.                                                                                              |
-| `OPEN_REGISTRATION`                      | `false`                                        | Allow sign-up without an invite code.                                                                                           |
-| `TICK_MS`                                | `5000`                                         | Real-time interval between game clock ticks.                                                                                    |
-| `SESSION_DAYS`                           | `180`                                          | Lifetime of browser logins. API tokens don't expire; revoke them in Settings.                                                   |
-| `PORT`                                   | `2567`                                         | Listen port.                                                                                                                    |
+| Variable                                 | Default                                        | Purpose                                                                                                                                    |
+| ---------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                           | `postgres://postgres@localhost:5432/seatrader` | Postgres connection. The stack files build it from `POSTGRES_*`.                                                                           |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD`      | –                                              | Creates (or promotes) this admin account on start.                                                                                         |
+| `PUBLIC_URL`                             | `http://localhost:5173`                        | Public URL of the web app. Used in push notification links and allowed for CORS.                                                           |
+| `CORS_ORIGINS`                           | –                                              | Extra comma-separated browser origins allowed to call the server (for example your GitHub Pages origin). `*` allows any origin.            |
+| `TRUST_PROXY`                            | –                                              | Set to `1` behind a reverse proxy.                                                                                                         |
+| `SERVE_WEB`                              | `true`                                         | Serve the bundled web app. Set to `false` for an API-only server.                                                                          |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | generated                                      | Web Push keys. If you leave them empty, a pair is generated once and stored in the database. `npm run vapid` prints a new pair.            |
+| `VAPID_SUBJECT`                          | `mailto:admin@example.com`                     | Contact address for push services.                                                                                                         |
+| `OPEN_REGISTRATION`                      | `false`                                        | Allow sign-up without an invite code.                                                                                                      |
+| `TICK_MS`                                | `5000`                                         | Real-time interval between game clock ticks.                                                                                               |
+| `SESSION_DAYS`                           | `180`                                          | Lifetime of browser logins. API tokens don't expire; revoke them in Settings.                                                              |
+| `PORT`                                   | `2567`                                         | Listen port.                                                                                                                               |
+| `EIA_API_KEY`                            | –                                              | Free key from [EIA open data](https://www.eia.gov/opendata/) for the daily Brent crude price. Without it, games use simulated fuel prices. |
+| `FEEDS_ENABLED`                          | `true`                                         | Fetch live data: severe storms from [GDACS](https://www.gdacs.org/) (no key) and the Brent price.                                          |
 
 ## A. Docker Compose
 
@@ -107,3 +109,17 @@ Players can switch the world map to a modern street map in Settings (stored per 
 [MapLibre GL](https://maplibre.org/) with the free [OpenFreeMap](https://openfreemap.org/) style, so there is
 nothing to configure and no API key. Players' browsers then load map data from `tiles.openfreemap.org`; if that
 host is unreachable the game falls back to the pixel map.
+
+## Real weather and fuel prices
+
+Each game has two switches (Admin → game → Settings; on by default for new games):
+
+- **Real weather.** The server checks [GDACS](https://www.gdacs.org/) tropical cyclone alerts every 30 minutes.
+  Only severe ones (orange and red alerts) are used. They appear on both maps, and a ship that sails into one
+  stops and asks its owner to sail through (damage and delay) or go around (extra days). Random storms become
+  rarer while real weather is on.
+- **Real fuel prices.** With `EIA_API_KEY` set, the server fetches the daily Brent crude price every 6 hours and
+  bunker prices follow it: at $75/bbl they are at their normal level, at $90 they are 20% higher.
+
+The admin panel's **Live data** box shows the current storms, the Brent price, when each was last updated and any
+errors. If a feed is unreachable, games keep their last data or fall back to simulation.
