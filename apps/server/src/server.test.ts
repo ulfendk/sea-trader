@@ -102,7 +102,13 @@ describe.runIf(available)('server', () => {
       (await j('POST', '/auth/register', { username: 'bob', password: 'bobpass12', invite: inv.data.code }))
         .status,
     ).toBe(400);
+    const beforeStart = Date.now();
     await j('POST', `/admin/games/${game.data.id}/start`, {}, adminToken);
+    const started = (await j<any[]>('GET', '/admin/games', undefined, adminToken)).data.find(
+      (g) => g.id === game.data.id,
+    );
+    expect(started.startTs).toBeGreaterThanOrEqual(beforeStart);
+    expect(started.startTs).toBeLessThanOrEqual(Date.now());
 
     const second = await j<{ token: string }>('POST', '/auth/login', {
       username: 'alice',

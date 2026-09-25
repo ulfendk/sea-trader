@@ -11,6 +11,7 @@ import {
   rankings,
   removePlayer,
   startGame,
+  startTsOf,
   PORTS_BY_ID,
   type Command,
   type GameSettings,
@@ -151,7 +152,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     s.serverTs = this.clockTs;
     s.status = g.status;
     s.timeScale = g.settings.timeScale;
-    s.startYear = g.settings.startYear;
+    s.startTs = startTsOf(g);
     s.durationDays = g.settings.durationDays;
     s.fuelIndex = Math.round(g.market.fuelIndex * 1000) / 1000;
     s.shipIndex = Math.round(g.market.shipIndex * 1000) / 1000;
@@ -269,7 +270,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   async setStatus(action: 'start' | 'pause' | 'end') {
     const pre = this.catchUp();
     let notices: Notice[] = [];
-    if (action === 'start') startGame(this.game);
+    if (action === 'start') startGame(this.game, Date.now());
     if (action === 'pause') pauseGame(this.game);
     if (action === 'end') notices = endGame(this.game);
     this.afterChange([...pre, ...notices]);

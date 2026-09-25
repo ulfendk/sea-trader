@@ -3,8 +3,8 @@ export type CargoType = 'general' | 'container' | 'bulk' | 'oil';
 export type GameStatus = 'lobby' | 'running' | 'paused' | 'finished';
 
 export interface GameSettings {
-  /** Calendar year the game starts in. */
-  startYear: number;
+  /** @deprecated Games now start at the real date and time; kept only to read old saves. */
+  startYear?: number;
   /** Game days per real day (1 = real time). */
   timeScale: number;
   startingCash: number;
@@ -20,7 +20,6 @@ export interface GameSettings {
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
-  startYear: 1990,
   timeScale: 1,
   startingCash: 6_000_000,
   maxPlayers: 8,
@@ -168,6 +167,8 @@ export interface GameState {
   version: 1;
   seed: number;
   rng: number;
+  /** Real-world instant (ms since epoch, UTC) that game day 0 corresponds to. Set when the game starts. */
+  startTs: number;
   day: number;
   status: GameStatus;
   settings: GameSettings;

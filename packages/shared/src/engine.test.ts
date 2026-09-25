@@ -104,9 +104,9 @@ describe('engine', () => {
 
   it('is deterministic for a seed', () => {
     const run = () => {
-      const s = createGame(7, { startingCash: 50_000_000 });
+      const s = createGame(7, { startingCash: 50_000_000 }, 1000);
       addPlayer(s, 'u1', 'A');
-      startGame(s);
+      startGame(s, 2000);
       applyCommand(s, 'u1', { type: 'buyShip', classId: 'general', port: 'sin', name: 'X' });
       const ship = Object.values(s.ships)[0];
       applyCommand(s, 'u1', { type: 'refuel', shipId: ship.id, tons: 900 });

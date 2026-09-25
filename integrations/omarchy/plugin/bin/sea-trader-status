@@ -57,7 +57,7 @@ fi
 tooltip=$(jq -r '
   if .count == 0 then "All ships are under way. Nothing to do."
   else ([.pending[] | "\(.game): \(.text)"] | join("\n")) end
-  + "\n\n" + ([.games[] | "\(.name) — \(.date)\(if .status != "running" then " (\(.status))" else "" end)"] | join("\n"))
+  + "\n\n" + ([.games[] | "\(.name) — \(.time / 1000 | floor | strflocaltime("%d %b %Y %H:%M"))\(if .status != "running" then " (\(.status))" else "" end)"] | join("\n"))
 ' <<<"$json")
 
 if ((urgent > 0)); then

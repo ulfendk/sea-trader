@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { formatDate } from '@sea-trader/shared';
+import { formatGameTime, gameTime } from '@sea-trader/shared';
 import { liveDay, pub } from '../net';
 
 export function useTicker(ms = 1000) {
@@ -10,8 +10,27 @@ export function useTicker(ms = 1000) {
   }, [ms]);
 }
 
-export function gameDateStr(day: number): string {
-  return formatDate(day, pub.value?.startYear ?? 1990);
+/** A game day as a date (optionally with time) in the player's own time zone. */
+export function gameDateStr(day: number, time = false): string {
+  return formatGameTime(pub.value?.startTs ?? 0, day, { time });
+}
+
+/** Real instant (ms, UTC) of a game day. */
+export function gameTs(day: number): number {
+  return gameTime(pub.value?.startTs ?? 0, day);
+}
+
+/** Formats an absolute instant in the player's own time zone. */
+export function localDateTime(ts: number): string {
+  return formatGameTime(ts, 0, { time: true });
+}
+
+/** Short name of the player's time zone, e.g. "CEST". */
+export function localZoneName(): string {
+  const part = new Intl.DateTimeFormat('en-GB', { timeZoneName: 'short' })
+    .formatToParts(new Date())
+    .find((p) => p.type === 'timeZoneName');
+  return part?.value ?? '';
 }
 
 /** Real-world duration for a span of game days. */

@@ -3,6 +3,7 @@ import { api, me, refreshMe } from '../api';
 import { navigate } from '../router';
 import { toast } from '../toast';
 import { Money, Win } from '../ui';
+import { localDateTime } from '../game/util';
 
 export function Lobby() {
   const data = me.value!;
@@ -54,7 +55,7 @@ export function Lobby() {
                 <span>Company</span>
                 <span>{g.company || '—'}</span>
                 <span>Date</span>
-                <span>{g.date}</span>
+                <span>{localDateTime(g.time)}</span>
                 <span>Cash</span>
                 <Money v={g.cash} />
                 <span>Players</span>

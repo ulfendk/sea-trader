@@ -3,7 +3,8 @@ import { randomInt } from 'node:crypto';
 import { matchMaker } from '@colyseus/core';
 import {
   createGame as createGameState,
-  formatDate,
+  gameTime,
+  startTsOf,
   pendingActions,
   type GameSettings,
   type GameState,
@@ -115,7 +116,8 @@ export async function gamesForUser(userId: string) {
       name: cur.name,
       status: st.status,
       day: st.day,
-      date: formatDate(st.day, st.settings.startYear),
+      /** Current game instant (ms, UTC); clients format it in their own time zone. */
+      time: gameTime(startTsOf(st), st.day),
       company: player?.company ?? '',
       cash: player?.cash ?? 0,
       players: Object.keys(st.players).length,

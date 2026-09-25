@@ -25,7 +25,7 @@ export function LogPanel() {
       <div class="log">
         {(tab === 'mine' ? mine : news).map((l, i) => (
           <div key={i} class={l.kind === 'bad' ? 'bad' : l.kind === 'good' ? 'good' : ''}>
-            <span class="muted">{gameDateStr(l.day)}</span> {l.text}
+            <span class="muted">{gameDateStr(l.day, true)}</span> {l.text}
           </div>
         ))}
         {(tab === 'mine' ? mine : news).length === 0 && <div class="muted">Nothing yet.</div>}
