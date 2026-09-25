@@ -451,6 +451,12 @@ function resolve(ctx: Ctx, ship: Ship, choice: string, inputs?: number[]): Comma
   const cls = getShipClass(ship.classId);
   const log = (text: string, kind: LogEntry['kind']) =>
     ctx.log({ player: ship.owner, ship: ship.id, text, kind }, true);
+  if (choice === 'playing') {
+    // The player started a mini-game: guarantee at least 5 real minutes to finish it.
+    if (p.kind !== 'pilot' && p.kind !== 'hazard') return { ok: false, error: 'Invalid choice' };
+    p.deadlineDay = Math.max(p.deadlineDay, s.day + (s.settings.timeScale * 5) / 1440);
+    return { ok: true };
+  }
   switch (p.kind) {
     case 'pilot': {
       if (choice === 'steer') {

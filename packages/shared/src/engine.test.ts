@@ -71,6 +71,11 @@ describe('engine', () => {
     for (let i = 0; i < 400 && !ship.pending; i++) advance(s, s.day + 0.05);
     expect(ship.pending?.kind).toBe('pilot');
     expect(pendingActions(s, 'u1')[0].kind).toBe('pilot');
+    const before = ship.pending!.deadlineDay;
+    expect(applyCommand(s, 'u1', { type: 'decide', shipId: ship.id, choice: 'playing' }).result.ok).toBe(
+      true,
+    );
+    expect(ship.pending!.deadlineDay).toBeGreaterThanOrEqual(before);
     const r = applyCommand(s, 'u1', { type: 'decide', shipId: ship.id, choice: 'tug' });
     expect(r.result.ok).toBe(true);
     advance(s, s.day + 1);
