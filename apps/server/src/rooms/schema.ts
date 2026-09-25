@@ -35,6 +35,20 @@ export const ShipPub = schema(
 );
 export type ShipPub = SchemaType<typeof ShipPub>;
 
+export const StormPub = schema(
+  {
+    id: t.string(),
+    name: t.string(),
+    lon: t.float64(),
+    lat: t.float64(),
+    radiusNm: t.number(),
+    severity: t.string(),
+    windKmh: t.number(),
+  },
+  'StormPub',
+);
+export type StormPub = SchemaType<typeof StormPub>;
+
 export const NewsItem = schema({ day: t.float64(), text: t.string(), kind: t.string() }, 'NewsItem');
 export type NewsItem = SchemaType<typeof NewsItem>;
 
@@ -56,6 +70,13 @@ export const GameStateSchema = schema(
     ships: t.map(ShipPub),
     news: t.array(NewsItem),
     winner: t.string(),
+    /** Real severe storms on the map (empty unless the game uses real weather). */
+    storms: t.array(StormPub),
+    realWeather: t.boolean(),
+    realFuel: t.boolean(),
+    /** Latest real Brent price (USD/bbl) and its date, 0/'' when unavailable. */
+    brent: t.float64(),
+    brentDate: t.string(),
   },
   'GameStateSchema',
 );

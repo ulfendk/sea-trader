@@ -55,6 +55,20 @@ export interface PubState {
   ships: Record<string, PubShip>;
   news: { day: number; text: string; kind: string }[];
   winner: string;
+  storms: PubStorm[];
+  realWeather: boolean;
+  realFuel: boolean;
+  brent: number;
+  brentDate: string;
+}
+export interface PubStorm {
+  id: string;
+  name: string;
+  lon: number;
+  lat: number;
+  radiusNm: number;
+  severity: string;
+  windKmh: number;
 }
 export interface PrivatePayload {
   me: PrivateView | null;

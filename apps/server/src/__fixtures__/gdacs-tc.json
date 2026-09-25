@@ -1,0 +1,80 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-45.2, 22.1] },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1001234,
+        "episodeid": 12,
+        "name": "HELENE-26",
+        "alertlevel": "Red",
+        "iscurrent": "true",
+        "fromdate": "2026-09-20T00:00:00",
+        "todate": "2026-09-25T00:00:00",
+        "severitydata": {
+          "severity": 213.0,
+          "severitytext": "Hurricane (maximum wind speed of 213 km/h)",
+          "severityunit": "km/h"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-44.0, 21.5] },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1001234,
+        "episodeid": 11,
+        "name": "HELENE-26",
+        "alertlevel": "Orange",
+        "iscurrent": "true",
+        "severitydata": { "severity": 150, "severityunit": "km/h" }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [132.5, 18.0] },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1001300,
+        "episodeid": 3,
+        "name": "KONG-REY-26",
+        "alertlevel": "Orange",
+        "iscurrent": true,
+        "severitydata": { "severity": 150, "severityunit": "km/h" }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [90.0, 15.0] },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1001301,
+        "episodeid": 1,
+        "name": "WEAK-26",
+        "alertlevel": "Green",
+        "iscurrent": "true"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [10.0, 40.0] },
+      "properties": { "eventtype": "EQ", "eventid": 55, "alertlevel": "Red", "iscurrent": "true" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [150.0, 10.0] },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 999,
+        "episodeid": 9,
+        "name": "OLD-25",
+        "alertlevel": "Red",
+        "iscurrent": "false",
+        "todate": "2025-10-01T00:00:00"
+      }
+    }
+  ]
+}

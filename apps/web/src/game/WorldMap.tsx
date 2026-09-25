@@ -26,7 +26,7 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
   const canvas = useRef<HTMLCanvasElement>(null);
   const view = useRef<View>({ z: 1, cx: MAP_W / 2, cy: MAP_H / 2 });
   const hits = useRef<
-    { x: number; y: number; r: number; kind: 'ship' | 'port'; id: string; label: string }[]
+    { x: number; y: number; r: number; kind: 'ship' | 'port' | 'storm'; id: string; label: string }[]
   >([]);
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
   const props = useRef({ myId, selectedShip, onSelectShip, onSelectPort, highlightPorts });
@@ -118,6 +118,40 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
                 ctx.fillRect(Math.round(sx), Math.round(sy), dpr, dpr);
             }
           }
+        }
+      }
+
+      // Real storms: translucent discs sized to their danger radius, with a pixel swirl.
+      for (const st of p?.storms ?? []) {
+        const [mx, my] = project(st.lon, st.lat);
+        const rPx = (st.radiusNm / 60) * CELL * scale;
+        const red = st.severity === 'red';
+        for (const [sx, sy] of toScreen(mx, my)) {
+          ctx.fillStyle = red ? 'rgba(200,40,40,0.28)' : 'rgba(240,150,40,0.28)';
+          ctx.beginPath();
+          ctx.arc(sx, sy, rPx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = red ? '#c83030' : '#f09628';
+          const u = Math.max(2, Math.round(px * 0.8));
+          const spin = Math.floor(t / 250) % 4;
+          for (let i = 0; i < 12; i++) {
+            const a = (i / 12) * Math.PI * 4 + spin * (Math.PI / 2);
+            const d = (i / 12) * Math.max(4 * u, rPx * 0.5);
+            ctx.fillRect(
+              Math.round(sx + Math.cos(a) * d - u / 2),
+              Math.round(sy + Math.sin(a) * d - u / 2),
+              u,
+              u,
+            );
+          }
+          newHits.push({
+            x: sx / dpr,
+            y: sy / dpr,
+            r: Math.max(12, rPx / dpr),
+            kind: 'storm',
+            id: st.id,
+            label: `🌀 ${st.name}${st.windKmh ? ` · ${st.windKmh} km/h` : ''}`,
+          });
         }
       }
 
@@ -221,12 +255,13 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
       const r = el.getBoundingClientRect();
       zoomAt(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - r.left, e.clientY - r.top);
     };
+    const rank = (h: { kind: string }) => (h.kind === 'ship' ? 2 : h.kind === 'port' ? 1 : 0);
     const hitAt = (x: number, y: number) => {
       let best: (typeof hits.current)[number] | null = null;
       let bd = Infinity;
       for (const h of hits.current) {
         const d = Math.hypot(h.x - x, h.y - y);
-        if (d < h.r && (d < bd || (best?.kind === 'port' && h.kind === 'ship'))) {
+        if (d < h.r && (!best || rank(h) > rank(best) || (rank(h) === rank(best) && d < bd))) {
           best = h;
           bd = d;
         }

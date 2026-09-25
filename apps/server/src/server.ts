@@ -5,6 +5,7 @@ import { ensureAdmin } from './auth.js';
 import { runMigrations } from './db/index.js';
 import { bootRooms, liveRooms, pruneNotifications } from './games.js';
 import { initPush } from './push.js';
+import { startFeeds } from './feeds.js';
 import { GameRoom } from './rooms/GameRoom.js';
 
 export async function startServer(port: number) {
@@ -24,11 +25,15 @@ export async function startServer(port: number) {
 
   await server.listen(port);
   await bootRooms();
+  const stopFeeds = startFeeds(() => {
+    for (const room of liveRooms.values()) room.applyFeeds();
+  });
   const prune = setInterval(() => void pruneNotifications().catch(() => undefined), 6 * 3600_000);
   return {
     server,
     async close() {
       clearInterval(prune);
+      stopFeeds();
       await Promise.all([...liveRooms.values()].map((r) => r.save()));
       await matchMaker.disconnectAll();
       await server.gracefullyShutdown(false);
