@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import {
   CARGO_LABEL,
   PORTS,
+  portsByRegion,
   portLocalTime,
   canalFee,
   findRoute,
@@ -438,14 +439,19 @@ function Sail({ ship, speed }: { ship: Ship; speed: number }) {
         Sail in ballast (empty) to reposition, e.g. to a port with better cargo for a {cls.name}.
       </p>
       <select value={to} onChange={(e) => setTo(e.currentTarget.value)}>
-        {PORTS.filter((x) => x.id !== ship.port)
-          .map((x) => ({ x, d: findRoute(here, x, routeOptsFor(cls)).distance }))
-          .sort((a, b) => a.d - b.d)
-          .map(({ x, d }) => (
-            <option key={x.id} value={x.id}>
-              {x.name} ({d} nm, exports {x.exports[cls.cargo]}/6)
-            </option>
-          ))}
+        {portsByRegion().map(([region, ports]) => (
+          <optgroup key={region} label={region}>
+            {ports
+              .filter((x) => x.id !== ship.port)
+              .map((x) => ({ x, d: findRoute(here, x, routeOptsFor(cls)).distance }))
+              .sort((a, b) => a.d - b.d)
+              .map(({ x, d }) => (
+                <option key={x.id} value={x.id}>
+                  {x.name} ({d} nm, exports {x.exports[cls.cargo]}/6)
+                </option>
+              ))}
+          </optgroup>
+        ))}
       </select>
       <div class="small-text">
         {est.route.distance} nm · {est.days.toFixed(1)} days (~{realDuration(est.days)} real) · needs{' '}

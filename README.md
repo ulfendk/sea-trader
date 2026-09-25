@@ -1,7 +1,7 @@
 # ⚓ Sea Trader
 
 A real-time multiplayer shipping game in the spirit of the Amiga classic _Ports of Call_. Every player
-runs a shipping company: buy freighters, take charters between 25 world ports, bunker fuel, dodge storms
+runs a shipping company: buy freighters, take charters between 45 world ports, bunker fuel, dodge storms
 and pirates, and steer ships into harbour yourself to save the tug fee. Time runs continuously
 (1 game day = 1 real day by default), so a voyage takes days and you check in when a ship needs orders.
 

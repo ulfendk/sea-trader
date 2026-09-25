@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import {
   CARGO_LABEL,
   PLAYER_COLORS,
-  PORTS,
+  portsByRegion,
   SHIP_CLASSES,
   formatMoney,
   getPort,
@@ -75,13 +75,15 @@ function Shipyard() {
           <label class="row right">
             Deliver to
             <select value={port} onChange={(e) => setPort(e.currentTarget.value)}>
-              {[...PORTS]
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
+              {portsByRegion().map(([region, ports]) => (
+                <optgroup key={region} label={region}>
+                  {ports.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
             </select>
           </label>
         )}
