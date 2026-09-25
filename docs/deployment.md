@@ -100,3 +100,10 @@ npm test
 
 To try things quickly, create a game in the admin panel with a large time scale, for example `1440`
 (one game day per real minute), or use **Skip days**.
+
+## Modern map
+
+Players can switch the world map to a modern street map in Settings (stored per device). It uses
+[MapLibre GL](https://maplibre.org/) with the free [OpenFreeMap](https://openfreemap.org/) style, so there is
+nothing to configure and no API key. Players' browsers then load map data from `tiles.openfreemap.org`; if that
+host is unreachable the game falls back to the pixel map.

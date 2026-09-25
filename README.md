@@ -12,6 +12,7 @@ and pirates, and steer ships into harbour yourself to save the tug fee. Time run
 - **Admin panel.** Create and configure games (time scale, starting cash, deadlines, length), invite
   players with links, and manage users.
 - **Pixel look** that nods to the original: bitmap fonts, bevelled windows, and a 1° pixel world map.
+- **Modern map option.** Players can switch to a zoomable street map (OpenStreetMap data via OpenFreeMap, no API key) per device, in Settings or from the map's title bar.
 
 ## Architecture
 
