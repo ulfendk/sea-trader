@@ -60,6 +60,8 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const cw = el.clientWidth;
       const ch = el.clientHeight;
+      // Hidden (e.g. another mobile tab is open): skip, or the zero size would poison the view with NaN.
+      if (!cw || !ch) return;
       if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) {
         cv.width = Math.round(cw * dpr);
         cv.height = Math.round(ch * dpr);
@@ -203,6 +205,7 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
     let pinch = 0;
     const base = () => el.clientWidth / MAP_W;
     const zoomAt = (factor: number, sx: number, sy: number) => {
+      if (!el.clientWidth || !el.clientHeight) return;
       const v = view.current;
       const nz = Math.max(1, Math.min(8, v.z * factor));
       const s0 = base() * v.z;
