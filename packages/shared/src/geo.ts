@@ -58,7 +58,22 @@ const FORCE_SEA: [number, number][] = [
   [101.5, 2.5],
   [100.5, 3.5],
   [99.5, 4.5],
-  // Dardanelles not needed; Messina not needed.
+  // Dardanelles, Sea of Marmara and Bosporus, for Istanbul and the Black Sea
+  [26.5, 40.5],
+  [27.5, 40.5],
+  [28.5, 40.5],
+  // St. Lawrence River up to Montreal (cells joined edge to edge; routes don't cut corners)
+  [-67.5, 49.5],
+  [-67.5, 48.5],
+  [-68.5, 48.5],
+  [-69.5, 48.5],
+  [-69.5, 47.5],
+  [-70.5, 47.5],
+  [-70.5, 46.5],
+  [-71.5, 46.5],
+  [-72.5, 46.5],
+  [-72.5, 45.5],
+  [-73.5, 45.5],
 ];
 
 /** Canal cells (open unless the ship is too large). */
@@ -365,16 +380,30 @@ export function pointAlong(route: Route, nm: number): { lon: number; lat: number
   return { lon: last[0], lat: last[1], heading: 0 };
 }
 
+/** Ports whose sea cell can't be reached from the first port (reachability is transitive). */
 export function allPortsReachable(): string[] {
-  const problems: string[] = [];
-  for (const a of PORTS)
-    for (const b of PORTS) {
-      if (a.id >= b.id) continue;
-      try {
-        findRoute(a, b);
-      } catch (e) {
-        problems.push(`${a.id}-${b.id}`);
+  const seen = new Uint8Array(W * H);
+  const [sx, sy] = portCell(PORTS[0]);
+  const queue = [idx(sx, sy)];
+  seen[queue[0]] = 1;
+  while (queue.length) {
+    const cur = queue.pop()!;
+    const cx = cur % W;
+    const cy = Math.floor(cur / W);
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const ny = cy + dy;
+        if ((!dx && !dy) || ny < 0 || ny >= H) continue;
+        const ni = idx(cx + dx, ny);
+        if (seen[ni] || LAND[ni]) continue;
+        // Same rule as routing: no corner cutting through land.
+        if (dx && dy && LAND[idx(cx + dx, cy)] && LAND[idx(cx, cy + dy)]) continue;
+        seen[ni] = 1;
+        queue.push(ni);
       }
-    }
-  return problems;
+  }
+  return PORTS.filter((p) => {
+    const [x, y] = portCell(p);
+    return !seen[idx(x, y)];
+  }).map((p) => p.id);
 }

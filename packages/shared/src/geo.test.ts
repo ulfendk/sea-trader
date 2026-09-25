@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { allPortsReachable, findRoute, getPort, pointAlong } from './index.js';
 
 describe('sea routing', () => {
-  it('connects every pair of ports', () => {
+  it('connects every port to every other', () => {
     expect(allPortsReachable()).toEqual([]);
   });
   it('uses Suez unless the ship is too large', () => {

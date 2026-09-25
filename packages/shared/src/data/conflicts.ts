@@ -19,12 +19,12 @@ export const DEFAULT_CONFLICT_ZONES: ConflictZone[] = [
   {
     id: 'black-sea',
     name: 'the Black Sea',
-    lon: 34,
-    lat: 43.5,
-    radiusNm: 300,
+    lon: 32.5,
+    lat: 44.5,
+    radiusNm: 250,
     level: 'war',
     detourDays: 2,
-    note: 'Sea mines and strikes on ports and shipping',
+    note: 'Sea mines and strikes on ports and shipping; avoiding it means waiting for a convoy through the corridor',
   },
   {
     id: 'hormuz',
