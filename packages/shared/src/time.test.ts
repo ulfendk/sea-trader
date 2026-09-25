@@ -5,6 +5,7 @@ import {
   createGame,
   formatGameTime,
   gameTime,
+  migrateGameState,
   getPort,
   portLocalTime,
   PORTS,
@@ -34,6 +35,25 @@ describe('game time', () => {
     s.status = 'paused';
     startGame(s, 999_999);
     expect(s.startTs).toBe(2000);
+  });
+
+  it('migrates old saves so the current game moment is the real time', () => {
+    const clockTs = Date.UTC(2026, 8, 25, 8, 0);
+    const s = createGame(1, {}, 0) as ReturnType<typeof createGame> & { startTs?: number };
+    s.status = 'running';
+    s.day = 42.5;
+    delete s.startTs;
+    s.settings.startYear = 1990;
+    expect(migrateGameState(s, clockTs)).toBe(true);
+    expect(gameTime(s.startTs!, s.day)).toBe(clockTs);
+    expect(s.settings.startYear).toBeUndefined();
+    // Idempotent
+    expect(migrateGameState(s, clockTs + 1000)).toBe(false);
+    // An old game that never started begins when it is started.
+    const lobby = createGame(2, {}, 0) as ReturnType<typeof createGame> & { startTs?: number };
+    delete lobby.startTs;
+    migrateGameState(lobby, clockTs);
+    expect(lobby.startTs).toBe(clockTs);
   });
 
   it('reads old saves that only had a start year', () => {

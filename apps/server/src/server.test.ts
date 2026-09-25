@@ -176,6 +176,27 @@ describe.runIf(available)('server', () => {
     await room2.leave();
   });
 
+  it('re-anchors games saved before real start times', async () => {
+    const { db, schema } = await import('./db/index.js');
+    const { createGame } = await import('@sea-trader/shared');
+    const state = createGame(5, {}) as ReturnType<typeof createGame> & { startTs?: number };
+    delete state.startTs;
+    state.settings.startYear = 1990;
+    state.status = 'finished';
+    state.day = 100;
+    const clockTs = Date.UTC(2026, 8, 20, 12, 0);
+    const [row] = await db
+      .insert(schema.games)
+      .values({ name: 'Old game', status: 'finished', state, clockTs })
+      .returning();
+    const games = (await j<any[]>('GET', '/admin/games', undefined, adminToken)).data;
+    const old = games.find((g) => g.id === row.id);
+    expect(old.startTs).toBe(clockTs - 100 * 86_400_000);
+    expect(old.time).toBe(clockTs);
+    const { loadGame } = await import('./games.js');
+    expect(((await loadGame(row.id))!.state as any).startTs).toBe(clockTs - 100 * 86_400_000);
+  });
+
   it('persists game state', async () => {
     const games = await j<any[]>('GET', '/admin/games', undefined, adminToken);
     const g = games.data.find((x) => x.name === 'Friends');

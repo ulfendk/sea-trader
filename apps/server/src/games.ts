@@ -4,6 +4,7 @@ import { matchMaker } from '@colyseus/core';
 import {
   createGame as createGameState,
   gameTime,
+  migrateGameState,
   startTsOf,
   pendingActions,
   type GameSettings,
@@ -30,7 +31,14 @@ export async function createGame(name: string, settings: Partial<GameSettings>) 
 
 export async function loadGame(id: string) {
   const rows = await db.select().from(schema.games).where(eq(schema.games.id, id)).limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+  // Games saved before real start times existed are re-anchored once and saved.
+  if (migrateGameState(row.state as GameState, row.clockTs)) {
+    await saveGame(row.id, row.state as GameState, row.clockTs);
+    console.log(`Migrated game "${row.name}" to a real start time`);
+  }
+  return row;
 }
 
 export async function saveGame(id: string, state: GameState, clockTs: number) {

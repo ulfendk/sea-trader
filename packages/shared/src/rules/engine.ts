@@ -20,6 +20,7 @@ import {
 } from '../types.js';
 import {
   berthFee,
+  DAY_MS,
   canalFee,
   fleetValue,
   formatMoney,
@@ -941,6 +942,19 @@ function newShip(
 }
 
 // ---------------------------------------------------------------- admin / lifecycle
+
+/**
+ * One-time upgrade for games saved before games had a real start time (they counted from 1 Jan of a
+ * start year). Anchors the game so that its day at `clockTs` (the real time it was last advanced to)
+ * is that real instant; ships, money and progress are untouched. Returns true if the state changed.
+ */
+export function migrateGameState(state: GameState, clockTs: number): boolean {
+  if (typeof state.startTs === 'number' && Number.isFinite(state.startTs)) return false;
+  state.startTs =
+    state.status === 'lobby' && state.day === 0 ? clockTs : clockTs - Math.round(state.day * DAY_MS);
+  delete state.settings.startYear;
+  return true;
+}
 
 /** Starts (or resumes) a game. A game that has not started yet begins at `now`, the real current time. */
 export function startGame(state: GameState, now = Date.now()) {
