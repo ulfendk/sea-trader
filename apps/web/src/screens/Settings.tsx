@@ -4,6 +4,7 @@ import { API_URL, SERVER_URL } from '../env';
 import { currentSubscription, disablePush, enablePush, pushSupported } from '../push';
 import { toast } from '../toast';
 import { Win } from '../ui';
+import { mapStyle, setMapStyle } from '../prefs';
 
 interface Session {
   id: string;
@@ -105,6 +106,33 @@ export function Settings() {
             Change password
           </button>
         </form>
+      </Win>
+
+      <Win title="World map on this device">
+        <div class="col">
+          <label class="row">
+            <input
+              type="radio"
+              name="mapStyle"
+              checked={mapStyle.value === 'pixel'}
+              onChange={() => setMapStyle('pixel')}
+            />
+            Pixel (classic)
+          </label>
+          <label class="row">
+            <input
+              type="radio"
+              name="mapStyle"
+              checked={mapStyle.value === 'modern'}
+              onChange={() => setMapStyle('modern')}
+            />
+            Modern (OpenStreetMap)
+          </label>
+          <span class="small-text muted">
+            The modern map is a zoomable street map from OpenFreeMap (OpenStreetMap data). It loads map data
+            from openfreemap.org, so it needs an internet connection.
+          </span>
+        </div>
       </Win>
 
       <Win title="Notifications on this device">

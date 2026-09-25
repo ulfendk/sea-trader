@@ -10,11 +10,17 @@ import { LogPanel } from '../game/Log';
 import { ShipOffice } from '../game/ShipOffice';
 import { gameDateStr, localZoneName, useTicker } from '../game/util';
 import { WorldMap } from '../game/WorldMap';
+import { ModernMap } from '../game/ModernMap';
+import { mapStyle, setMapStyle } from '../prefs';
+import { toast } from '../toast';
 
 export function Game({ id }: { id: string }) {
   useTicker(1000);
   const [selected, setSelected] = useState<string | null>(query.value.get('ship'));
   const [tab, setTab] = useState<'map' | 'ships' | 'company'>('map');
+  // Modern map failed to load this session (offline or blocked): fall back without changing the saved choice.
+  const [modernFailed, setModernFailed] = useState(false);
+  const showModern = mapStyle.value === 'modern' && !modernFailed;
 
   useEffect(() => {
     void connectGame(id);
@@ -99,15 +105,42 @@ export function Game({ id }: { id: string }) {
           title="World"
           class="map-win"
           bodyClass=""
-          right={<span class="small-text">{p.timeScale === 1 ? 'real time' : `${p.timeScale}× speed`}</span>}
+          right={
+            <span class="row" style={{ gap: '6px' }}>
+              <span class="small-text">{p.timeScale === 1 ? 'real time' : `${p.timeScale}× speed`}</span>
+              <button
+                class="small"
+                title="Switch between the pixel map and the modern map"
+                onClick={() => {
+                  setModernFailed(false);
+                  setMapStyle(mapStyle.value === 'modern' ? 'pixel' : 'modern');
+                }}
+              >
+                {showModern ? 'Pixel map' : 'Modern map'}
+              </button>
+            </span>
+          }
         >
           <div style={{ margin: '-10px' }}>
-            <WorldMap
-              myId={myId}
-              selectedShip={selected}
-              onSelectShip={select}
-              highlightPorts={pendingPorts}
-            />
+            {showModern ? (
+              <ModernMap
+                myId={myId}
+                selectedShip={selected}
+                onSelectShip={select}
+                highlightPorts={pendingPorts}
+                onFail={(reason) => {
+                  setModernFailed(true);
+                  toast(`${reason} Showing the pixel map instead.`, 'err');
+                }}
+              />
+            ) : (
+              <WorldMap
+                myId={myId}
+                selectedShip={selected}
+                onSelectShip={select}
+                highlightPorts={pendingPorts}
+              />
+            )}
           </div>
           {otherShip && (
             <div class="small-text" style={{ marginTop: '14px' }}>
