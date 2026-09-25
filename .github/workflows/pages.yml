@@ -5,9 +5,8 @@ name: GitHub Pages
 # e.g. https://seatrader.example.com, and add the Pages origin to the server's CORS_ORIGINS.
 # Optional variable PAGES_CNAME for a custom domain (the site is then served from /).
 
+# Disabled for automatic runs (the game is self-hosted); run manually from the Actions tab if needed.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

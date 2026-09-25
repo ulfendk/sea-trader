@@ -71,6 +71,6 @@ CI (`.github/workflows`):
 
 - `ci.yml`: lint, tests against Postgres, and build
 - `docker.yml`: multi-arch image to GHCR, with an optional Portainer webhook
-- `pages.yml`: web client to GitHub Pages
+- `pages.yml`: web client to GitHub Pages (manual only; not needed when self-hosting)
 
 The world map comes from [Natural Earth](https://www.naturalearthdata.com/) (public domain), rasterised to 1°.

@@ -66,7 +66,7 @@ docker exec <db-container> pg_dump -U seatrader seatrader > seatrader-$(date +%F
 
 ## B. Web client on GitHub Pages
 
-The workflow `.github/workflows/pages.yml` builds the web app and publishes it to Pages.
+The workflow `.github/workflows/pages.yml` builds the web app and publishes it to Pages. It only runs when started manually.
 
 1. Deploy the server as in A (it can keep serving its own copy of the web app).
 2. In GitHub → **Settings → Pages**, set _Source_ to **GitHub Actions**.
@@ -74,7 +74,7 @@ The workflow `.github/workflows/pages.yml` builds the web app and publishes it t
    - `SEA_TRADER_SERVER_URL` = `https://seatrader.example.com` (required)
    - `PAGES_CNAME` = `play.example.com` (optional custom domain; the app is then built for `/` instead of `/sea-trader/`)
 4. On the server, allow the Pages origin: `CORS_ORIGINS=https://ulfendk.github.io` (or your custom domain).
-5. Push to `main` or run the workflow manually.
+5. Run the **GitHub Pages** workflow manually from the Actions tab (it does not run on push).
 
 Notes:
 
