@@ -1,0 +1,19 @@
+/* Sea Trader status module */
+#custom-sea-trader {
+  margin: 0 7.5px;
+}
+#custom-sea-trader.pending {
+  color: #f0d040;
+}
+#custom-sea-trader.urgent {
+  color: #ff5050;
+  animation: sea-trader-blink 1s steps(2) infinite;
+}
+#custom-sea-trader.offline {
+  opacity: 0.5;
+}
+@keyframes sea-trader-blink {
+  to {
+    opacity: 0.35;
+  }
+}
