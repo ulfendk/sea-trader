@@ -128,6 +128,7 @@ export function ModernMap({
           { animate: false, padding: 0 },
         );
         map.addSource('night', { type: 'geojson', data: fc([]) });
+        map.addSource('conflicts', { type: 'geojson', data: fc([]) });
         map.addSource('storms', { type: 'geojson', data: fc([]) });
         map.addSource('route', { type: 'geojson', data: fc([]) });
         map.addSource('ports', { type: 'geojson', data: fc([]) });
@@ -137,6 +138,27 @@ export function ModernMap({
           type: 'fill',
           source: 'night',
           paint: { 'fill-color': '#04081f', 'fill-opacity': 0.28 },
+        });
+        const zoneColor = [
+          'match',
+          ['get', 'level'],
+          'war',
+          '#b01048',
+          'high',
+          '#c83078',
+          '#be6eaa',
+        ] as unknown as string;
+        map.addLayer({
+          id: 'conflicts-fill',
+          type: 'fill',
+          source: 'conflicts',
+          paint: { 'fill-color': zoneColor, 'fill-opacity': 0.22 },
+        });
+        map.addLayer({
+          id: 'conflicts-line',
+          type: 'line',
+          source: 'conflicts',
+          paint: { 'line-color': zoneColor, 'line-width': 2, 'line-dasharray': [1, 1.5] },
         });
         map.addLayer({
           id: 'storms-fill',
@@ -209,10 +231,10 @@ export function ModernMap({
           },
         });
 
-        const rank = (id: string) => (id === 'ships' ? 0 : id === 'ports' ? 1 : 2);
+        const rank = (id: string) => (id === 'ships' ? 0 : id === 'ports' ? 1 : id === 'storms-fill' ? 2 : 3);
         const pick = (e: MapMouseEvent) =>
           map
-            .queryRenderedFeatures(e.point, { layers: ['ships', 'ports', 'storms-fill'] })
+            .queryRenderedFeatures(e.point, { layers: ['ships', 'ports', 'storms-fill', 'conflicts-fill'] })
             .sort(
               (a: { layer: { id: string } }, b: { layer: { id: string } }) =>
                 rank(a.layer.id) - rank(b.layer.id),
@@ -252,6 +274,17 @@ export function ModernMap({
             ),
           );
           if (!p) return;
+          (map.getSource('conflicts') as GeoJSONSource).setData(
+            fc(
+              (p.conflicts ?? []).map((z) =>
+                circlePolygon(z.lon, z.lat, z.radiusNm, {
+                  id: z.id,
+                  level: z.level,
+                  label: `⚠ ${z.name[0].toUpperCase()}${z.name.slice(1)} · ${z.level === 'war' ? 'war zone' : `${z.level} risk`}`,
+                }),
+              ),
+            ),
+          );
           (map.getSource('storms') as GeoJSONSource).setData(
             fc(
               (p.storms ?? []).map((st) =>

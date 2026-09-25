@@ -245,6 +245,28 @@ function Decision({ ship }: { ship: Ship }) {
           </div>
         </>
       )}
+      {d.kind === 'conflict' && (
+        <>
+          <p style={{ margin: '0 0 6px' }}>
+            ⚠ <b>{ship.name}</b> is approaching <b>{d.place}</b>,{' '}
+            {d.level === 'war'
+              ? 'a war zone'
+              : d.level === 'high'
+                ? 'a high-risk area'
+                : 'an elevated-risk area'}
+            . Pay <b>{formatMoney(d.premium ?? 0)}</b> war-risk cover and sail through (risk of attack), or
+            avoid it by rerouting or waiting for an escort (+{d.detourDays} days)?
+          </p>
+          <div class="row">
+            <button class="danger" onClick={() => choose('through')}>
+              Sail through
+            </button>
+            <button class="primary" onClick={() => choose('avoid')}>
+              Avoid
+            </button>
+          </div>
+        </>
+      )}
       {d.kind === 'distress' && (
         <>
           <p style={{ margin: '0 0 6px' }}>

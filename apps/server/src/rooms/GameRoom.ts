@@ -14,6 +14,7 @@ import {
   startTsOf,
   applyStorms,
   applyBrent,
+  applyConflicts,
   PORTS_BY_ID,
   type Command,
   type GameSettings,
@@ -23,8 +24,9 @@ import {
 import { userFromToken, type AuthUser } from '../auth.js';
 import { config } from '../config.js';
 import { handleNotices, isMember, liveRooms, loadGame, saveGame } from '../games.js';
-import { GameStateSchema, NewsItem, PlayerPub, ShipPub, StormPub } from './schema.js';
+import { ConflictPub, GameStateSchema, NewsItem, PlayerPub, ShipPub, StormPub } from './schema.js';
 import { feeds } from '../feeds.js';
+import { conflictZones } from '../conflicts.js';
 
 interface ClientData {
   userId: string;
@@ -33,6 +35,8 @@ interface ClientData {
 }
 
 const SAVE_EVERY_MS = 15_000;
+/** Public news items kept in the shared state. */
+const NEWS_MAX = 80;
 
 export class GameRoom extends Room<{ state: GameStateSchema }> {
   autoDispose = false;
@@ -45,6 +49,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   clockTs = Date.now();
   private dirty = false;
   private stormKey = '';
+  private conflictKey = '';
   private lastSave = Date.now();
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -164,6 +169,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     s.winner = g.winner ?? '';
     s.realWeather = !!g.settings.realWeather;
     s.realFuel = !!g.settings.realFuel;
+    s.realConflicts = !!g.settings.realConflicts;
     s.brent = g.market.brent ?? 0;
     s.brentDate = g.market.brentDate ?? '';
     const storms = g.storms ?? [];
@@ -175,6 +181,18 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
         const p = new StormPub();
         Object.assign(p, st);
         s.storms.push(p);
+      }
+    }
+
+    const zones = g.conflicts ?? [];
+    const zoneKey = JSON.stringify(zones);
+    if (zoneKey !== this.conflictKey) {
+      this.conflictKey = zoneKey;
+      s.conflicts.clear();
+      for (const z of zones) {
+        const p = new ConflictPub();
+        Object.assign(p, { ...z, note: z.note ?? '' });
+        s.conflicts.push(p);
       }
     }
 
@@ -218,7 +236,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     }
     for (const id of [...s.ships.keys()]) if (!g.ships[id]) s.ships.delete(id);
 
-    const news = g.log.filter((l) => l.player === null).slice(-25);
+    const news = g.log.filter((l) => l.player === null).slice(-NEWS_MAX);
     const last = s.news.length ? s.news[s.news.length - 1] : null;
     const lastNews = news[news.length - 1];
     if (!last || !lastNews || last.day !== lastNews.day || last.text !== lastNews.text) {
@@ -228,6 +246,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
         item.day = n.day;
         item.text = n.text;
         item.kind = n.kind;
+        item.topic = n.topic ?? '';
         s.news.push(item);
       }
     }
@@ -297,9 +316,10 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     await this.save();
   }
 
-  /** Copies the latest real-world storms and Brent price into the game. */
+  /** Copies the latest real-world storms, Brent price and conflict zones into the game. */
   applyFeeds(broadcast = true) {
     applyStorms(this.game, feeds.storms);
+    applyConflicts(this.game, conflictZones());
     if (feeds.brent && feeds.brentDate) applyBrent(this.game, feeds.brent, feeds.brentDate);
     if (broadcast) {
       this.scheduleSave();

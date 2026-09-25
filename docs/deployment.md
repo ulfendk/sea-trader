@@ -123,3 +123,15 @@ Each game has two switches (Admin → game → Settings; on by default for new g
 
 The admin panel's **Live data** box shows the current storms, the Brent price, when each was last updated and any
 errors. If a feed is unreachable, games keep their last data or fall back to simulation.
+
+New storms, storms that strengthen or pass, and Brent moves of 5% or more are posted to each game's news.
+
+## Conflict zones
+
+There is no reliable open feed for maritime war-risk areas, so the admin keeps the list in **Admin → Conflict
+zones** (it starts from a built-in list based on UKMTO/JMIC advisories: the Red Sea and Gulf of Aden, the Black
+Sea, the Strait of Hormuz, the Gulf of Guinea and the Somali Basin). Each zone has a position (click the map),
+radius, level (elevated, high, war) and the extra days a ship needs to avoid it. Zones are stored in the database
+and apply to every game with **Conflict zones** switched on (the default for new games). A ship entering one can
+pay war-risk cover (0.1%, 0.35% or 1% of its value) and sail through with a 2%, 6% or 15% chance of being
+attacked, or avoid it. Adding, changing or removing a zone is announced in each game's news.

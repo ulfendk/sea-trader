@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { PORTS, gameTime, getPort, portLocalTime, type Port } from '@sea-trader/shared';
+import { PORTS, gameTime, getPort, haversineNm, portLocalTime, type Port } from '@sea-trader/shared';
 import { liveDay, pub, type PubShip } from '../net';
 import { colorHex } from '../ui';
 import { CELL, ROWS, getLandCanvas, getNightCanvas, project, shipPosition, shipRouteFor } from './mapdata';
@@ -26,7 +26,7 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
   const canvas = useRef<HTMLCanvasElement>(null);
   const view = useRef<View>({ z: 1, cx: MAP_W / 2, cy: MAP_H / 2 });
   const hits = useRef<
-    { x: number; y: number; r: number; kind: 'ship' | 'port' | 'storm'; id: string; label: string }[]
+    { x: number; y: number; r: number; kind: 'ship' | 'port' | 'storm' | 'zone'; id: string; label: string }[]
   >([]);
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
   const props = useRef({ myId, selectedShip, onSelectShip, onSelectPort, highlightPorts });
@@ -101,23 +101,118 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
       const blink = Math.floor(t / 500) % 2 === 0;
       const { myId: mine, selectedShip: sel, highlightPorts: hl } = props.current;
 
-      // Route of the selected ship.
-      if (p && sel && p.ships[sel]) {
-        const s = p.ships[sel];
-        const route = shipRouteFor(s);
-        if (route && (s.status === 'at_sea' || s.status === 'awaiting_pilot')) {
-          ctx.fillStyle = '#f8f8f8';
-          for (let i = 1; i < route.points.length; i++) {
-            const [ax, ay] = project(route.points[i - 1][0], route.points[i - 1][1]);
-            const [bx, by] = project(route.points[i][0], route.points[i][1]);
-            const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 6);
-            for (let j = 0; j < steps; j += 2) {
-              const mx = ax + ((bx - ax) * j) / steps;
-              const my = ay + ((by - ay) * j) / steps;
-              for (const [sx, sy] of toScreen(((mx % MAP_W) + MAP_W) % MAP_W, my))
-                ctx.fillRect(Math.round(sx), Math.round(sy), dpr, dpr);
+      // Routes: my ships at sea in thin dots, the selected ship bold, with the sailed part dimmed.
+      if (p) {
+        for (const s of Object.values(p.ships)) {
+          const isSel = s.id === sel;
+          if (!isSel && s.owner !== mine) continue;
+          if (s.status !== 'at_sea' && s.status !== 'awaiting_pilot') continue;
+          const route = shipRouteFor(s);
+          if (!route) continue;
+          const color = colorHex(p.players[s.owner]?.color ?? 0xffffff);
+          // Split the route (map coordinates, longitudes unwrapped) at the ship's progress.
+          const sailed: [number, number][] = [];
+          const ahead: [number, number][] = [];
+          let nm = 0;
+          for (let i = 0; i < route.points.length; i++) {
+            const [lon, lat] = route.points[i];
+            const pt = project(lon, lat);
+            if (i > 0) {
+              const [plon, plat] = route.points[i - 1];
+              const seg = haversineNm(plon, plat, lon, lat);
+              if (nm < s.progressNm && nm + seg >= s.progressNm) {
+                const f = seg ? (s.progressNm - nm) / seg : 0;
+                const prev = project(plon, plat);
+                const cut: [number, number] = [
+                  prev[0] + (pt[0] - prev[0]) * f,
+                  prev[1] + (pt[1] - prev[1]) * f,
+                ];
+                sailed.push(cut);
+                ahead.push(cut);
+              }
+              nm += seg;
+            }
+            (nm <= s.progressNm ? sailed : ahead).push(pt);
+          }
+          const w = (isSel ? 3 : 2) * dpr;
+          const stroke = (pts: [number, number][], col: string, dash: number[]) => {
+            if (pts.length < 2) return;
+            for (const k of [-1, 0, 1]) {
+              ctx.beginPath();
+              pts.forEach(([mx, my], i) => {
+                const x = ox + (mx + k * MAP_W) * scale;
+                const y = oy + my * scale;
+                if (i) ctx.lineTo(x, y);
+                else ctx.moveTo(x, y);
+              });
+              ctx.setLineDash(dash);
+              ctx.lineCap = 'butt';
+              ctx.lineJoin = 'round';
+              ctx.strokeStyle = '#101010';
+              ctx.lineWidth = w + 2 * dpr;
+              ctx.stroke();
+              ctx.strokeStyle = col;
+              ctx.lineWidth = w;
+              ctx.stroke();
+            }
+          };
+          stroke(sailed, '#7d8aa3', [2 * dpr, 4 * dpr]);
+          stroke(ahead, isSel ? '#f8f8f8' : color, isSel ? [8 * dpr, 4 * dpr] : [4 * dpr, 4 * dpr]);
+          ctx.setLineDash([]);
+          if (isSel) {
+            // Destination flag.
+            const [dlon, dlat] = route.points[route.points.length - 1];
+            const [dx, dy] = project(dlon, dlat);
+            const u = Math.max(2, Math.round(dpr * 1.5));
+            for (const [sx, sy] of toScreen(((dx % MAP_W) + MAP_W) % MAP_W, dy)) {
+              const x = Math.round(sx);
+              const y = Math.round(sy);
+              ctx.fillStyle = '#101010';
+              ctx.fillRect(x - u, y - 7 * u, 5 * u, 8 * u);
+              ctx.fillStyle = '#f8f8f8';
+              ctx.fillRect(x, y - 6 * u, u, 6 * u);
+              ctx.fillStyle = color;
+              ctx.fillRect(x + u, y - 6 * u, 3 * u, 2 * u);
             }
           }
+        }
+      }
+
+      // Conflict zones: hatched discs with a dotted border and a warning sign.
+      for (const z of p?.conflicts ?? []) {
+        const [mx, my] = project(z.lon, z.lat);
+        const rPx = (z.radiusNm / 60) * CELL * scale;
+        const col = z.level === 'war' ? '176,16,72' : z.level === 'high' ? '200,48,120' : '190,110,170';
+        for (const [sx, sy] of toScreen(mx, my)) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(sx, sy, rPx, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${col},0.2)`;
+          ctx.fill();
+          ctx.fillStyle = hatch(ctx, col, dpr);
+          ctx.fill();
+          ctx.restore();
+          const u = Math.max(1, Math.round(dpr));
+          ctx.fillStyle = `rgb(${col})`;
+          const dots = Math.max(16, Math.round(rPx / (3 * dpr)));
+          for (let i = 0; i < dots; i += 1) {
+            const a = (i / dots) * Math.PI * 2;
+            ctx.fillRect(
+              Math.round(sx + Math.cos(a) * rPx - u),
+              Math.round(sy + Math.sin(a) * rPx - u),
+              2 * u,
+              2 * u,
+            );
+          }
+          drawWarning(ctx, sx, sy, Math.max(2, Math.round(dpr * 1.5)), `rgb(${col})`);
+          newHits.push({
+            x: sx / dpr,
+            y: sy / dpr,
+            r: Math.max(12, rPx / dpr),
+            kind: 'zone',
+            id: z.id,
+            label: `⚠ ${z.name[0].toUpperCase()}${z.name.slice(1)} · ${z.level === 'war' ? 'war zone' : `${z.level} risk`}`,
+          });
         }
       }
 
@@ -255,7 +350,8 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
       const r = el.getBoundingClientRect();
       zoomAt(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - r.left, e.clientY - r.top);
     };
-    const rank = (h: { kind: string }) => (h.kind === 'ship' ? 2 : h.kind === 'port' ? 1 : 0);
+    const rank = (h: { kind: string }) =>
+      h.kind === 'ship' ? 3 : h.kind === 'port' ? 2 : h.kind === 'storm' ? 1 : 0;
     const hitAt = (x: number, y: number) => {
       let best: (typeof hits.current)[number] | null = null;
       let bd = Infinity;
@@ -355,6 +451,9 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
 }
 
 /** Tiny pixel ship sprite pointing east/west depending on heading. */
+// East-facing ship sprite: c = hull (player colour), w = superstructure, f = funnel.
+const SHIP_SPRITE = ['....f.....', '..www.....', '..www.....', 'ccccccccccc', 'cccccccccc.', '.cccccccc..'];
+
 function drawShip(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -366,22 +465,68 @@ function drawShip(
   selected: boolean,
   alert: boolean,
 ) {
-  const u = Math.max(1, Math.round(px / 1.5)) * (selected ? 2 : 1);
+  const u = Math.max(1, Math.round(px / 2)) + (selected ? 1 : 0);
   const west = Math.cos(heading) < 0;
-  // hull 5x2, cabin 2x1
-  const hull = west ? ['.#####', '##### '] : ['#####.', ' #####'];
-  const ox = Math.round(x - 3 * u);
-  const oy = Math.round(y - u);
-  if (mine || selected) {
-    ctx.fillStyle = selected ? '#f8f8f8' : '#101010';
-    ctx.fillRect(ox - u, oy - 2 * u, 8 * u, 5 * u);
-  }
-  ctx.fillStyle = alert ? '#f8f8f8' : color;
-  hull.forEach((row, r) => {
-    for (let c = 0; c < row.length; c++) if (row[c] === '#') ctx.fillRect(ox + c * u, oy + r * u, u, u);
+  const w = SHIP_SPRITE[0].length;
+  const h = SHIP_SPRITE.length;
+  const ox = Math.round(x - (w * u) / 2);
+  const oy = Math.round(y - (h * u) / 2);
+  const cells: [number, number, string][] = [];
+  SHIP_SPRITE.forEach((row, r) => {
+    for (let c = 0; c < w; c++) if (row[c] !== '.') cells.push([west ? w - 1 - c : c, r, row[c]]);
   });
-  ctx.fillStyle = alert ? color : '#f8f8f8';
-  ctx.fillRect(ox + (west ? 3 : 1) * u, oy - u, 2 * u, u);
+  // Outline: white when selected, dark otherwise; own ships get a thicker one.
+  const o = selected || mine ? 2 * u : u;
+  ctx.fillStyle = selected ? '#f8f8f8' : '#101010';
+  for (const [c, r] of cells) ctx.fillRect(ox + c * u - o, oy + r * u - o, u + 2 * o, u + 2 * o);
+  if (selected) {
+    ctx.fillStyle = '#101010';
+    for (const [c, r] of cells) ctx.fillRect(ox + c * u - u, oy + r * u - u, 3 * u, 3 * u);
+  }
+  for (const [c, r, k] of cells) {
+    ctx.fillStyle =
+      k === 'c' ? color : k === 'w' ? (alert ? '#e02020' : '#f8f8f8') : alert ? '#f8f8f8' : '#101010';
+    ctx.fillRect(ox + c * u, oy + r * u, u, u);
+  }
+}
+
+const hatches = new Map<string, CanvasPattern | string>();
+
+/** Diagonal pixel hatching for conflict zones, cached per colour and pixel ratio. */
+function hatch(ctx: CanvasRenderingContext2D, rgb: string, dpr: number): CanvasPattern | string {
+  const key = `${rgb}@${dpr}`;
+  let pat = hatches.get(key);
+  if (!pat) {
+    const u = Math.max(1, Math.round(dpr));
+    const n = 6 * u;
+    const c = document.createElement('canvas');
+    c.width = c.height = n;
+    const g = c.getContext('2d')!;
+    g.fillStyle = `rgba(${rgb},0.5)`;
+    for (let i = 0; i < 6; i++) g.fillRect(i * u, (5 - i) * u, u, u);
+    pat = ctx.createPattern(c, 'repeat') ?? `rgba(${rgb},0.3)`;
+    hatches.set(key, pat);
+  }
+  return pat;
+}
+
+/** Small pixel warning triangle with an exclamation mark. */
+function drawWarning(ctx: CanvasRenderingContext2D, x: number, y: number, u: number, color: string) {
+  const rows = ['...#...', '..###..', '..#w#..', '.##w##.', '.#####.', '###w###', '#######'];
+  const ox = Math.round(x - 3.5 * u);
+  const oy = Math.round(y - 3.5 * u);
+  ctx.fillStyle = '#101010';
+  rows.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++)
+      if (row[c] !== '.') ctx.fillRect(ox + (c - 1) * u, oy + (r - 1) * u, 3 * u, 3 * u);
+  });
+  rows.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) {
+      if (row[c] === '.') continue;
+      ctx.fillStyle = row[c] === 'w' ? '#f8f8f8' : color;
+      ctx.fillRect(ox + c * u, oy + r * u, u, u);
+    }
+  });
 }
 
 export function portLabel(p: Port | string) {

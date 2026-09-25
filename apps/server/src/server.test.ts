@@ -240,6 +240,46 @@ describe.runIf(available)('server', () => {
     expect(sim.market.fuelIndex).toBe(1);
   });
 
+  it('lets the admin manage conflict zones and applies them to games', async () => {
+    const got = await j<any>('GET', '/admin/conflicts', undefined, adminToken);
+    expect(got.data.zones.length).toBeGreaterThan(0);
+    const game = await j<{ id: string }>(
+      'POST',
+      '/admin/games',
+      { name: 'War risk', settings: {} },
+      adminToken,
+    );
+    const { liveRooms } = await import('./games.js');
+    const room = liveRooms.get(game.data.id)!;
+    expect(room.game.conflicts?.length).toBe(got.data.zones.length);
+    const saved = await j<any>(
+      'PUT',
+      '/admin/conflicts',
+      {
+        zones: [
+          { name: 'Test Strait', lon: 500, lat: 10, radiusNm: 5, level: 'war', detourDays: 3 },
+          { name: '', lon: 0, lat: 0 },
+        ],
+      },
+      adminToken,
+    );
+    expect(saved.status).toBe(200);
+    expect(saved.data.zones).toEqual([
+      expect.objectContaining({ name: 'Test Strait', lon: 180, radiusNm: 20, level: 'war', detourDays: 3 }),
+    ]);
+    expect(room.game.conflicts?.map((z) => z.name)).toEqual(['Test Strait']);
+    expect(room.state.conflicts.length).toBe(1);
+    expect(room.game.log.filter((l) => l.topic === 'conflict').at(-1)?.text).toMatch(/no longer/);
+    const alice = await j<{ token: string }>('POST', '/auth/login', {
+      username: 'alice',
+      password: 'alicepass1',
+    });
+    const noAccess = await j<any>('PUT', '/admin/conflicts', { zones: [] }, alice.data.token);
+    expect(noAccess.status).toBe(403);
+    await j('POST', '/admin/conflicts/reset', {}, adminToken);
+    expect(room.game.conflicts?.length).toBe(got.data.zones.length);
+  });
+
   it('persists game state', async () => {
     const games = await j<any[]>('GET', '/admin/games', undefined, adminToken);
     const g = games.data.find((x) => x.name === 'Friends');

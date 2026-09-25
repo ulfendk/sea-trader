@@ -8,9 +8,12 @@ import {
   DEFAULT_SETTINGS,
   type Command,
   type CommandResult,
+  type ConflictLevel,
+  type ConflictZone,
   type GameSettings,
   type GameState,
   type LogEntry,
+  type NewsTopic,
   type Notice,
   type PendingDecision,
   type PlayerState,
@@ -70,12 +73,21 @@ export class Ctx {
     return new StateRng(this.state);
   }
   log(entry: Omit<LogEntry, 'day'>, notify = false, action = false) {
-    const s = this.state;
-    s.log.push({ day: Math.round(s.day * 100) / 100, ...entry });
-    if (s.log.length > LOG_MAX) s.log.splice(0, s.log.length - LOG_MAX);
+    pushLog(this.state, entry);
     if (entry.player && (notify || action))
       this.notices.push({ player: entry.player, ship: entry.ship, text: entry.text, action });
   }
+}
+
+function pushLog(s: GameState, entry: Omit<LogEntry, 'day'>) {
+  s.log.push({ day: Math.round(s.day * 100) / 100, ...entry });
+  if (s.log.length > LOG_MAX) s.log.splice(0, s.log.length - LOG_MAX);
+}
+
+/** Public news item, seen by every player in the game. */
+function news(s: GameState, text: string, kind: LogEntry['kind'], topic: NewsTopic) {
+  if (s.status === 'finished') return;
+  pushLog(s, { player: null, text: text.charAt(0).toUpperCase() + text.slice(1), kind, topic });
 }
 
 export function createGame(seed: number, settings: Partial<GameSettings> = {}, now = Date.now()): GameState {
@@ -121,6 +133,7 @@ export function addPlayer(state: GameState, id: string, name: string, company?: 
   new Ctx(state).log({
     player: null,
     text: `${player.company} has entered the shipping business.`,
+    topic: 'company',
     kind: 'info',
   });
   return player;
@@ -558,6 +571,38 @@ function resolve(ctx: Ctx, ship: Ship, choice: string, inputs?: number[]): Comma
       } else return { ok: false, error: 'Invalid choice' };
       break;
     }
+    case 'conflict': {
+      const place = p.place ?? 'the conflict zone';
+      const level = p.level ?? 'elevated';
+      if (choice === 'through') {
+        spend(ctx, player, p.premium ?? 0);
+        const rng = new Rng(p.seed);
+        if (rng.chance(CONFLICT_ATTACK[level])) {
+          const dmg = Math.round(rng.range(10, level === 'war' ? 30 : 20));
+          const delay = Math.round(rng.range(1, 2.5) * 10) / 10;
+          damage(ship, dmg);
+          hold(ship, s.day, delay);
+          log(
+            `${ship.name} came under attack in ${place}: ${dmg}% damage, ${delay} days lost (war-risk cover ${formatMoney(p.premium ?? 0)}).`,
+            'bad',
+          );
+          ctx.log({
+            player: null,
+            text: `${player.company}'s ${ship.name} was attacked in ${place}.`,
+            kind: 'bad',
+            topic: 'conflict',
+          });
+        } else
+          log(
+            `${ship.name} passed through ${place} safely (war-risk cover ${formatMoney(p.premium ?? 0)}).`,
+            'info',
+          );
+      } else if (choice === 'avoid') {
+        hold(ship, s.day, p.detourDays ?? 1);
+        log(`${ship.name} avoided ${place} (+${p.detourDays} days).`, 'info');
+      } else return { ok: false, error: 'Invalid choice' };
+      break;
+    }
   }
   void cls;
   ship.pending = null;
@@ -570,6 +615,7 @@ const DEFAULT_CHOICE: Record<PendingDecision['kind'], string> = {
   hazard: 'detour',
   distress: 'ignore',
   weather: 'around',
+  conflict: 'avoid',
 };
 
 // ---------------------------------------------------------------- real-world feeds
@@ -577,17 +623,144 @@ const DEFAULT_CHOICE: Record<PendingDecision['kind'], string> = {
 /** Brent price (USD/bbl) at which bunker prices are at their base level (fuel index 1). */
 export const BASE_BRENT = 75;
 
-/** Replaces the game's list of real storms (from the weather feed). */
-export function applyStorms(state: GameState, storms: Storm[]) {
-  state.storms = state.settings.realWeather ? storms.map((st) => ({ ...st })) : [];
+/** Brent move (fraction) since the last fuel news item that makes the news again. */
+const BRENT_NEWS_MOVE = 0.05;
+
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+
+/** Describes a sea position relative to the nearest port, e.g. "820 nm east of New York". */
+export function describePlace(lon: number, lat: number): string {
+  let best = PORTS[0];
+  let bd = Infinity;
+  for (const port of PORTS) {
+    const d = haversineNm(port.lon, port.lat, lon, lat);
+    if (d < bd) {
+      bd = d;
+      best = port;
+    }
+  }
+  if (bd < 60) return `off ${best.name}`;
+  const dLon = ((lon - best.lon + 540) % 360) - 180;
+  const dLat = lat - best.lat;
+  const deg = (Math.atan2(dLon * Math.cos(((lat + best.lat) / 2) * (Math.PI / 180)), dLat) * 180) / Math.PI;
+  const dir = COMPASS[Math.round((deg + 360) / 45) % 8];
+  return `${Math.round(bd / 10) * 10} nm ${dir} of ${best.name}`;
 }
 
-/** Records the latest real Brent price; the fuel index follows it at the next daily update. */
+/** Replaces the game's list of real storms (from the weather feed) and reports changes as news. */
+export function applyStorms(state: GameState, storms: Storm[]) {
+  if (!state.settings.realWeather) {
+    state.storms = [];
+    return;
+  }
+  const prev = new Map((state.storms ?? []).map((st) => [st.id, st]));
+  for (const st of storms) {
+    const old = prev.get(st.id);
+    const wind = st.windKmh ? `, winds ${Math.round(st.windKmh)} km/h` : '';
+    if (!old)
+      news(
+        state,
+        `${st.name} (${st.severity} alert${wind}) is raging ${describePlace(st.lon, st.lat)}. Ships should steer clear.`,
+        'bad',
+        'weather',
+      );
+    else if (old.severity !== st.severity)
+      news(
+        state,
+        st.severity === 'red'
+          ? `${st.name} has strengthened to a red alert${wind}, ${describePlace(st.lon, st.lat)}.`
+          : `${st.name} has weakened to an orange alert, ${describePlace(st.lon, st.lat)}.`,
+        st.severity === 'red' ? 'bad' : 'info',
+        'weather',
+      );
+  }
+  for (const old of prev.values())
+    if (!storms.some((st) => st.id === old.id))
+      news(state, `${old.name} has blown itself out; the danger has passed.`, 'good', 'weather');
+  state.storms = storms.map((st) => ({ ...st }));
+}
+
+/** Records the latest real Brent price; the fuel index follows it. Notable moves make the news. */
 export function applyBrent(state: GameState, usd: number, date: string) {
   if (!(usd > 0)) return;
-  state.market.brent = usd;
-  state.market.brentDate = date;
-  if (state.settings.realFuel) state.market.fuelIndex = brentFuelIndex(usd);
+  const m = state.market;
+  m.brent = usd;
+  m.brentDate = date;
+  if (!state.settings.realFuel) return;
+  m.fuelIndex = brentFuelIndex(usd);
+  const last = m.brentNews;
+  const price = `$${usd.toFixed(2)}/bbl`;
+  if (!last) news(state, `Bunker prices now follow Brent crude, trading at ${price}.`, 'info', 'fuel');
+  else if (Math.abs(usd / last - 1) >= BRENT_NEWS_MOVE) {
+    const up = usd > last;
+    const pct = Math.abs((usd / last - 1) * 100).toFixed(1);
+    news(
+      state,
+      `Brent crude ${up ? 'up' : 'down'} ${pct}% to ${price}: bunker prices ${up ? 'rise' : 'fall'}.`,
+      up ? 'bad' : 'good',
+      'fuel',
+    );
+  } else return;
+  m.brentNews = usd;
+}
+
+const LEVEL_RANK: Record<ConflictLevel, number> = { elevated: 1, high: 2, war: 3 };
+export const CONFLICT_LEVEL_TEXT: Record<ConflictLevel, string> = {
+  elevated: 'an elevated-risk area',
+  high: 'a high-risk area',
+  war: 'a war zone',
+};
+/** War-risk insurance premium as a fraction of the ship's value, per transit. */
+export const CONFLICT_PREMIUM: Record<ConflictLevel, number> = { elevated: 0.001, high: 0.0035, war: 0.01 };
+/** Chance that a ship sailing through is attacked. */
+export const CONFLICT_ATTACK: Record<ConflictLevel, number> = { elevated: 0.02, high: 0.06, war: 0.15 };
+
+const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`);
+
+/** Replaces the game's conflict zones (from the admin's list) and reports changes as news. */
+export function applyConflicts(state: GameState, zones: ConflictZone[]) {
+  if (!state.settings.realConflicts) {
+    state.conflicts = [];
+    return;
+  }
+  const prev = new Map((state.conflicts ?? []).map((z) => [z.id, z]));
+  for (const z of zones) {
+    const old = prev.get(z.id);
+    if (!old)
+      news(
+        state,
+        sentence(`${z.name} is now ${CONFLICT_LEVEL_TEXT[z.level]}${z.note ? `: ${z.note.trim()}` : ''}`),
+        'bad',
+        'conflict',
+      );
+    else if (old.level !== z.level) {
+      const worse = LEVEL_RANK[z.level] > LEVEL_RANK[old.level];
+      news(
+        state,
+        `${z.name} ${worse ? 'escalates' : 'calms down'}: now ${CONFLICT_LEVEL_TEXT[z.level]}.`,
+        worse ? 'bad' : 'good',
+        'conflict',
+      );
+    }
+  }
+  for (const old of prev.values())
+    if (!zones.some((z) => z.id === old.id))
+      news(state, `${old.name} is no longer considered a conflict zone.`, 'good', 'conflict');
+  state.conflicts = zones.map((z) => ({ ...z }));
+}
+
+/** The first conflict zone (not yet faced this voyage) that contains the ship. */
+function conflictAt(state: GameState, ship: Ship): ConflictZone | null {
+  const zones = state.conflicts;
+  if (!zones?.length || !state.settings.realConflicts || !ship.voyage) return null;
+  const route = shipRoute(ship);
+  if (!route) return null;
+  const pos = pointAlong(route, ship.voyage.progressNm);
+  for (const z of zones) {
+    if (ship.voyage.conflictsMet?.includes(z.id)) continue;
+    if (haversineNm(pos.lon, pos.lat, z.lon, z.lat) <= z.radiusNm) return z;
+  }
+  return null;
 }
 
 export function brentFuelIndex(usd: number): number {
@@ -632,6 +805,7 @@ function daily(ctx: Ctx) {
         player: null,
         text: `${player.company} has gone bankrupt! The bank seized the fleet.`,
         kind: 'bad',
+        topic: 'company',
       });
       ctx.notices.push({ player: player.id, text: 'Your company has gone bankrupt.', action: false });
     }
@@ -646,7 +820,7 @@ function daily(ctx: Ctx) {
     s.market.freight[t] = walk(s.market.freight[t], 0.02, 0.6, 1.8);
   if (!realFuel && rng.chance(0.004)) {
     s.market.fuelIndex = Math.min(2.2, s.market.fuelIndex * 1.35);
-    ctx.log({ player: null, text: 'OIL CRISIS! Bunker prices soar worldwide.', kind: 'bad' });
+    ctx.log({ player: null, text: 'OIL CRISIS! Bunker prices soar worldwide.', kind: 'bad', topic: 'fuel' });
   }
   const dayInt = Math.floor(s.day);
   if (dayInt % 30 === 0) refreshUsedMarket(ctx);
@@ -663,6 +837,7 @@ function finish(ctx: Ctx) {
     player: null,
     text: `The game is over! ${ranked[0] ? `${ranked[0].company} wins with ${formatMoney(ranked[0].netWorth)}.` : ''}`,
     kind: 'good',
+    topic: 'game',
   });
   for (const p of Object.values(s.players))
     ctx.notices.push({ player: p.id, text: 'The game has ended.', action: false });
@@ -714,6 +889,30 @@ function stepShip(ctx: Ctx, ship: Ship, dt: number) {
             seed: rng.int(1, 2 ** 30),
           },
           `${ship.name} is running into ${storm.name}${storm.windKmh ? ` (winds ${Math.round(storm.windKmh)} km/h)` : ''}. Sail through or go around (+${detourDays} days)?`,
+        );
+        return;
+      }
+      const zone = conflictAt(s, ship);
+      if (zone) {
+        (v.conflictsMet ??= []).push(zone.id);
+        const rng = new Rng(hashParts(s.seed, ship.id, zone.id, Math.floor(v.departDay * 100)));
+        const premium = Math.max(
+          1000,
+          Math.round((shipValue(ship, s.market, s.day) * CONFLICT_PREMIUM[zone.level]) / 1000) * 1000,
+        );
+        raise(
+          ctx,
+          ship,
+          {
+            kind: 'conflict',
+            zoneId: zone.id,
+            place: zone.name,
+            level: zone.level,
+            detourDays: zone.detourDays,
+            premium,
+            seed: rng.int(1, 2 ** 30),
+          },
+          `${ship.name} is approaching ${zone.name}, ${CONFLICT_LEVEL_TEXT[zone.level]}. Pay ${formatMoney(premium)} war-risk cover and sail through, or avoid it (+${zone.detourDays} days)?`,
         );
         return;
       }
@@ -824,7 +1023,12 @@ function run(ctx: Ctx, playerId: string, cmd: Command): CommandResult {
         text: `${player.company} took delivery of the new ${cls.name} ${name} in ${getPort(cmd.port).name}.`,
         kind: 'good',
       });
-      ctx.log({ player: null, text: `${player.company} bought a new ${cls.name}.`, kind: 'info' });
+      ctx.log({
+        player: null,
+        text: `${player.company} bought a new ${cls.name}.`,
+        kind: 'info',
+        topic: 'company',
+      });
       return { ok: true };
     }
     case 'buyUsed': {
@@ -841,6 +1045,7 @@ function run(ctx: Ctx, playerId: string, cmd: Command): CommandResult {
         player: null,
         text: `${player.company} bought a second-hand ${cls.name} in ${getPort(l.port).name}.`,
         kind: 'info',
+        topic: 'company',
       });
       return { ok: true };
     }
@@ -1102,6 +1307,7 @@ export function pendingActions(state: GameState, playerId: string): PendingActio
         hazard: 'needs a navigation decision',
         distress: 'received a distress call',
         weather: 'is heading into a storm',
+        conflict: 'is approaching a conflict zone',
       };
       out.push({
         shipId: ship.id,

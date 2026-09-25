@@ -4,6 +4,7 @@ import { api } from '../api';
 import { toast } from '../toast';
 import { Money, Tabs, Win } from '../ui';
 import { errText, localDateTime } from '../game/util';
+import { ConflictZonesTab } from './ConflictZones';
 
 interface AdminGame {
   id: string;
@@ -40,7 +41,7 @@ interface Invite {
   expiresAt: string | null;
 }
 
-type NumericSetting = Exclude<keyof GameSettings, 'startYear' | 'realWeather' | 'realFuel'>;
+type NumericSetting = Exclude<keyof GameSettings, 'startYear' | 'realWeather' | 'realFuel' | 'realConflicts'>;
 
 interface Overview {
   uptime: number;
@@ -108,7 +109,7 @@ const SETTING_FIELDS: [NumericSetting, string, string][] = [
 ];
 
 export function Admin() {
-  const [tab, setTab] = useState<'games' | 'users' | 'invites'>('games');
+  const [tab, setTab] = useState<'games' | 'users' | 'invites' | 'conflicts'>('games');
   const [games, setGames] = useState<AdminGame[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -166,6 +167,7 @@ export function Admin() {
             ['games', 'Games'],
             ['users', 'Users'],
             ['invites', 'Invites'],
+            ['conflicts', 'Conflict zones'],
           ]}
           value={tab}
           onChange={setTab}
@@ -181,6 +183,7 @@ export function Admin() {
         {tab === 'games' && <GamesTab games={games} users={users} act={act} />}
         {tab === 'users' && <UsersTab users={users} act={act} />}
         {tab === 'invites' && <InvitesTab invites={invites} games={games} act={act} />}
+        {tab === 'conflicts' && <ConflictZonesTab />}
       </Win>
     </div>
   );
@@ -451,6 +454,14 @@ function SettingsForm({
           onChange={(e) => onChange('realFuel', e.currentTarget.checked)}
         />
         Real fuel prices: bunker prices follow the live Brent crude price
+      </label>
+      <label class="row">
+        <input
+          type="checkbox"
+          checked={!!value.realConflicts}
+          onChange={(e) => onChange('realConflicts', e.currentTarget.checked)}
+        />
+        Conflict zones: the zones on the Conflict zones tab appear on the map and threaten ships
       </label>
     </div>
   );
