@@ -128,17 +128,15 @@ export async function gamesForUser(userId: string) {
 /** Stores notices, and pushes the ones that need the player's attention. */
 export async function handleNotices(gameId: string, gameName: string, notices: Notice[]) {
   if (!notices.length) return;
-  await db
-    .insert(schema.notifications)
-    .values(
-      notices.map((n) => ({
-        userId: n.player,
-        gameId,
-        shipId: n.ship ?? null,
-        text: n.text,
-        action: n.action,
-      })),
-    );
+  await db.insert(schema.notifications).values(
+    notices.map((n) => ({
+      userId: n.player,
+      gameId,
+      shipId: n.ship ?? null,
+      text: n.text,
+      action: n.action,
+    })),
+  );
   const byUser = new Map<string, Notice[]>();
   for (const n of notices) if (n.action) byUser.set(n.player, [...(byUser.get(n.player) ?? []), n]);
   for (const [userId, list] of byUser) {

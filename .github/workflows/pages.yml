@@ -1,0 +1,57 @@
+name: GitHub Pages
+
+# Publishes the web client to GitHub Pages. The game server still runs elsewhere (Portainer/Docker):
+# set the repository variable SEA_TRADER_SERVER_URL (Settings → Secrets and variables → Actions → Variables),
+# e.g. https://seatrader.example.com, and add the Pages origin to the server's CORS_ORIGINS.
+# Optional variable PAGES_CNAME for a custom domain (the site is then served from /).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build web client
+        env:
+          VITE_SERVER_URL: ${{ vars.SEA_TRADER_SERVER_URL }}
+          VITE_BASE: ${{ vars.PAGES_CNAME != '' && '/' || format('/{0}/', github.event.repository.name) }}
+          PAGES_CNAME: ${{ vars.PAGES_CNAME }}
+        run: |
+          if [ -z "$VITE_SERVER_URL" ]; then
+            echo "::error::Set the SEA_TRADER_SERVER_URL repository variable to your game server URL"
+            exit 1
+          fi
+          npm run build -w @sea-trader/shared
+          npm run build -w @sea-trader/web
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

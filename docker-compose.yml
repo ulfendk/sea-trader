@@ -1,0 +1,41 @@
+# Local / self-hosted: builds the image from this repo.
+# For Portainer use deploy/portainer-stack.yml (pulls the published image).
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '${APP_PORT:-2567}:2567'
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-seatrader}:${POSTGRES_PASSWORD:-seatrader}@db:5432/${POSTGRES_DB:-seatrader}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:2567}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      OPEN_REGISTRATION: ${OPEN_REGISTRATION:-false}
+      SERVE_WEB: ${SERVE_WEB:-true}
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-seatrader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seatrader}
+      POSTGRES_DB: ${POSTGRES_DB:-seatrader}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  db-data:

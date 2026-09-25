@@ -4,3 +4,4 @@ coverage
 apps/server/drizzle
 packages/shared/src/data/landmask.ts
 package-lock.json
+integrations/omarchy/*.jsonc

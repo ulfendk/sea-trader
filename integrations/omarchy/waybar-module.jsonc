@@ -1,0 +1,9 @@
+  "custom/sea-trader": {
+    "exec": "~/.local/bin/sea-trader-status",
+    "return-type": "json",
+    "interval": 60,
+    "signal": 9,
+    "tooltip": true,
+    "on-click": "~/.local/bin/sea-trader-open",
+    "on-click-right": "pkill -RTMIN+9 waybar"
+  },
