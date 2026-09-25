@@ -14,6 +14,8 @@ and pirates, and steer ships into harbour yourself to save the tug fee. Time run
 - **Pixel look** that nods to the original: bitmap fonts, bevelled windows, and a 1° pixel world map.
 - **Real weather and fuel prices.** Live severe storms (GDACS) show up on the map and block routes, and bunker
   prices can follow the real Brent crude price (free EIA key). Switchable per game.
+- **Conflict zones.** Admin-managed war-risk areas (Red Sea, Black Sea, Hormuz, …) on the map: pay war-risk cover
+  and risk an attack, or reroute. Storms, zones and big oil price moves make the in-game news.
 - **Modern map option.** Players can switch to a zoomable street map (OpenStreetMap data via OpenFreeMap, no API key) per device, in Settings or from the map's title bar.
 
 ## Architecture

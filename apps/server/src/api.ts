@@ -1,7 +1,14 @@
 import express, { type NextFunction, type Request, type Response, type Router } from 'express';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
-import { DEFAULT_SETTINGS, gameTime, pendingActions, startTsOf, type GameSettings } from '@sea-trader/shared';
+import {
+  DEFAULT_CONFLICT_ZONES,
+  DEFAULT_SETTINGS,
+  gameTime,
+  pendingActions,
+  startTsOf,
+  type GameSettings,
+} from '@sea-trader/shared';
 import {
   bearer,
   createSession,
@@ -32,6 +39,7 @@ import {
 } from './games.js';
 import { vapidPublicKey } from './push.js';
 import { feeds } from './feeds.js';
+import { cleanZones, conflictZones, resetConflictZones, saveConflictZones } from './conflicts.js';
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
 const h = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
@@ -88,7 +96,7 @@ function cleanSettings(input: unknown): Partial<GameSettings> {
   num('durationDays', 0, 365 * 100);
   num('eventRate', 0, 10);
   num('interestRate', 0, 1);
-  for (const k of ['realWeather', 'realFuel'] as const)
+  for (const k of ['realWeather', 'realFuel', 'realConflicts'] as const)
     if (typeof src[k] === 'boolean') out[k] = src[k] as boolean;
   return out;
 }
@@ -605,6 +613,31 @@ export function apiRouter(): Router {
     h(async (req, res) => {
       await db.delete(schema.invites).where(eq(schema.invites.code, String(req.params.code)));
       res.json({ ok: true });
+    }),
+  );
+
+  a.get(
+    '/conflicts',
+    h(async (_req, res) => {
+      res.json({ zones: conflictZones(), defaults: DEFAULT_CONFLICT_ZONES });
+    }),
+  );
+
+  a.put(
+    '/conflicts',
+    h(async (req, res) => {
+      await saveConflictZones(cleanZones(req.body?.zones));
+      for (const room of liveRooms.values()) room.applyFeeds();
+      res.json({ zones: conflictZones() });
+    }),
+  );
+
+  a.post(
+    '/conflicts/reset',
+    h(async (_req, res) => {
+      await resetConflictZones();
+      for (const room of liveRooms.values()) room.applyFeeds();
+      res.json({ zones: conflictZones() });
     }),
   );
 

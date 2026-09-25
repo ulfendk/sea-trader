@@ -53,13 +53,25 @@ export interface PubState {
   shipIndex: number;
   players: Record<string, PubPlayer>;
   ships: Record<string, PubShip>;
-  news: { day: number; text: string; kind: string }[];
+  news: { day: number; text: string; kind: string; topic: string }[];
   winner: string;
   storms: PubStorm[];
+  conflicts: PubConflict[];
+  realConflicts: boolean;
   realWeather: boolean;
   realFuel: boolean;
   brent: number;
   brentDate: string;
+}
+export interface PubConflict {
+  id: string;
+  name: string;
+  lon: number;
+  lat: number;
+  radiusNm: number;
+  level: string;
+  detourDays: number;
+  note: string;
 }
 export interface PubStorm {
   id: string;

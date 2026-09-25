@@ -6,12 +6,14 @@ import { runMigrations } from './db/index.js';
 import { bootRooms, liveRooms, pruneNotifications } from './games.js';
 import { initPush } from './push.js';
 import { startFeeds } from './feeds.js';
+import { loadConflictZones } from './conflicts.js';
 import { GameRoom } from './rooms/GameRoom.js';
 
 export async function startServer(port: number) {
   await runMigrations();
   await ensureAdmin();
   await initPush();
+  await loadConflictZones();
 
   const server = new Server({
     transport: new WebSocketTransport({ pingInterval: 15000, pingMaxRetries: 4 }),

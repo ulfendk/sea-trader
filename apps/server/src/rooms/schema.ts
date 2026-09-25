@@ -49,7 +49,25 @@ export const StormPub = schema(
 );
 export type StormPub = SchemaType<typeof StormPub>;
 
-export const NewsItem = schema({ day: t.float64(), text: t.string(), kind: t.string() }, 'NewsItem');
+export const ConflictPub = schema(
+  {
+    id: t.string(),
+    name: t.string(),
+    lon: t.float64(),
+    lat: t.float64(),
+    radiusNm: t.number(),
+    level: t.string(),
+    detourDays: t.number(),
+    note: t.string(),
+  },
+  'ConflictPub',
+);
+export type ConflictPub = SchemaType<typeof ConflictPub>;
+
+export const NewsItem = schema(
+  { day: t.float64(), text: t.string(), kind: t.string(), topic: t.string() },
+  'NewsItem',
+);
 export type NewsItem = SchemaType<typeof NewsItem>;
 
 export const GameStateSchema = schema(
@@ -74,6 +92,9 @@ export const GameStateSchema = schema(
     storms: t.array(StormPub),
     realWeather: t.boolean(),
     realFuel: t.boolean(),
+    /** Conflict zones on the map (empty unless the game uses them). */
+    conflicts: t.array(ConflictPub),
+    realConflicts: t.boolean(),
     /** Latest real Brent price (USD/bbl) and its date, 0/'' when unavailable. */
     brent: t.float64(),
     brentDate: t.string(),

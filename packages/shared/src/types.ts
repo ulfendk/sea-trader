@@ -21,6 +21,8 @@ export interface GameSettings {
   realWeather?: boolean;
   /** Drive bunker prices from the real Brent crude price. Missing on older games = off. */
   realFuel?: boolean;
+  /** Put the admin-managed conflict zones in ships' way. Missing on older games = off. */
+  realConflicts?: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   interestRate: 0.08,
   realWeather: true,
   realFuel: true,
+  realConflicts: true,
 };
 
 /** A real severe storm (tropical cyclone) from the weather feed. */
@@ -46,6 +49,22 @@ export interface Storm {
   severity: 'orange' | 'red';
   /** Maximum sustained wind (km/h), if known. */
   windKmh: number;
+}
+
+export type ConflictLevel = 'elevated' | 'high' | 'war';
+
+/** A conflict zone (war risk, attacks, piracy) maintained by the server admin. */
+export interface ConflictZone {
+  id: string;
+  name: string;
+  lon: number;
+  lat: number;
+  radiusNm: number;
+  level: ConflictLevel;
+  /** Extra days a ship needs to avoid the zone (reroute or wait for an escort). */
+  detourDays: number;
+  /** Short background shown to players. */
+  note?: string;
 }
 
 export interface PlayerState {
@@ -118,9 +137,11 @@ export interface Voyage {
   canals: string[];
   /** Real storms already met on this voyage (each is faced once). */
   stormsMet?: string[];
+  /** Conflict zones already faced on this voyage (each is faced once). */
+  conflictsMet?: string[];
 }
 
-export type DecisionKind = 'pilot' | 'pirates' | 'hazard' | 'distress' | 'weather';
+export type DecisionKind = 'pilot' | 'pirates' | 'hazard' | 'distress' | 'weather' | 'conflict';
 
 export interface PendingDecision {
   kind: DecisionKind;
@@ -139,6 +160,11 @@ export interface PendingDecision {
   stormId?: string;
   stormName?: string;
   severity?: 'orange' | 'red';
+  /** Conflict zone the ship is facing (conflict decisions). */
+  zoneId?: string;
+  level?: ConflictLevel;
+  /** War-risk insurance premium for sailing through a conflict zone. */
+  premium?: number;
 }
 
 export interface Ship {
@@ -180,13 +206,19 @@ export interface LogEntry {
   ship?: string;
   text: string;
   kind: 'info' | 'good' | 'bad' | 'action';
+  /** Category of public news, for filtering. */
+  topic?: NewsTopic;
 }
+
+export type NewsTopic = 'weather' | 'fuel' | 'conflict' | 'company' | 'game';
 
 export interface Market {
   fuelIndex: number;
   /** Latest real Brent crude price (USD/bbl) and its date, when the fuel feed is available. */
   brent?: number;
   brentDate?: string;
+  /** Brent price at the last fuel news item, to report notable moves only. */
+  brentNews?: number;
   shipIndex: number;
   freight: Record<CargoType, number>;
 }
@@ -212,6 +244,8 @@ export interface GameState {
   winner?: string | null;
   /** Current real severe storms (set by the server's weather feed). */
   storms?: Storm[];
+  /** Current conflict zones (set by the server from the admin's list). */
+  conflicts?: ConflictZone[];
 }
 
 /** Notice produced by the rules engine for the server to forward (push, status bar, feed). */

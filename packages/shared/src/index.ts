@@ -3,6 +3,7 @@ export * from './rng.js';
 export * from './geo.js';
 export * from './data/ports.js';
 export * from './data/ships.js';
+export * from './data/conflicts.js';
 export * from './rules/economy.js';
 export * from './rules/offers.js';
 export * from './rules/engine.js';
