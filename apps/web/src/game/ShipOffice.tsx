@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import {
   CARGO_LABEL,
   PORTS,
+  portLocalTime,
   canalFee,
   findRoute,
   formatMoney,
@@ -26,7 +27,7 @@ import { toast } from '../toast';
 import { Bar, Money, Tabs, Win } from '../ui';
 import { HarborGame } from '../minigames/HarborGame';
 import { ReefGame } from '../minigames/ReefGame';
-import { gameDateStr, realDuration, STATUS_LABEL, useTicker } from './util';
+import { gameDateStr, gameTs, realDuration, STATUS_LABEL, useTicker } from './util';
 
 type Tab = 'charter' | 'sail' | 'bunker' | 'dock' | 'sell';
 
@@ -60,8 +61,8 @@ export function ShipOffice({ ship }: { ship: Ship }) {
     const v = ship.voyage;
     const left = Math.max(0, v.distance - v.progressNm);
     const eta = day + Math.max(0, v.holdUntil - day) + left / (v.speed * 24);
-    where = `${getPort(v.from).name} → ${port.name} · ${Math.round(v.progressNm)}/${v.distance} nm · ETA ${gameDateStr(eta)} (${realDuration(eta - day)})`;
-  } else where = port.name;
+    where = `${getPort(v.from).name} → ${port.name} · ${Math.round(v.progressNm)}/${v.distance} nm · ETA ${gameDateStr(eta, true)} (${realDuration(eta - day)})`;
+  } else where = `${port.name} · local time ${portLocalTime(port.tz, gameTs(day))}`;
 
   return (
     <Win title={`${ship.name}`} right={<span class="small-text">{cls.name}</span>}>

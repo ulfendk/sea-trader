@@ -8,7 +8,7 @@ import { CompanyPanel } from '../game/Company';
 import { Fleet } from '../game/Fleet';
 import { LogPanel } from '../game/Log';
 import { ShipOffice } from '../game/ShipOffice';
-import { gameDateStr, useTicker } from '../game/util';
+import { gameDateStr, localZoneName, useTicker } from '../game/util';
 import { WorldMap } from '../game/WorldMap';
 
 export function Game({ id }: { id: string }) {
@@ -66,7 +66,7 @@ export function Game({ id }: { id: string }) {
         <b style={{ fontFamily: 'var(--font-head)', fontSize: '10px' }}>{p.name}</b>
         <span class="stat">
           <b>DATE</b>
-          {gameDateStr(liveDay())}
+          {gameDateStr(liveDay(), true)} <span class="muted">{localZoneName()}</span>
         </span>
         {pv.me && (
           <>

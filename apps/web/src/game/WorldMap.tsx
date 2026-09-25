@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { PORTS, getPort, type Port } from '@sea-trader/shared';
+import { PORTS, gameTime, getPort, portLocalTime, type Port } from '@sea-trader/shared';
 import { liveDay, pub, type PubShip } from '../net';
 import { colorHex } from '../ui';
-import { CELL, ROWS, getLandCanvas, project, shipPosition, shipRouteFor } from './mapdata';
+import { CELL, ROWS, getLandCanvas, getNightCanvas, project, shipPosition, shipRouteFor } from './mapdata';
 
 interface Props {
   myId: string;
@@ -77,14 +77,17 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
       const oy = cv.height / 2 - v.cy * scale;
       ctx.fillStyle = '#2a4d8f';
       ctx.fillRect(0, 0, cv.width, cv.height);
-      for (const k of [-1, 0, 1])
-        ctx.drawImage(
-          land,
-          Math.round(ox + k * MAP_W * scale),
-          Math.round(oy),
-          Math.round(MAP_W * scale),
-          Math.round(MAP_H * scale),
-        );
+      const now = p ? gameTime(p.startTs, liveDay()) : Date.now();
+      const night = getNightCanvas(now);
+      for (const layer of [land, night])
+        for (const k of [-1, 0, 1])
+          ctx.drawImage(
+            layer,
+            Math.round(ox + k * MAP_W * scale),
+            Math.round(oy),
+            Math.round(MAP_W * scale),
+            Math.round(MAP_H * scale),
+          );
 
       const toScreen = (mx: number, my: number): [number, number][] =>
         [-1, 0, 1]
@@ -133,7 +136,14 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
             ctx.fillStyle = '#f8f8f8';
             ctx.fillText(port.name, Math.round(sx + s + 3 * dpr), Math.round(sy + 5 * dpr));
           }
-          newHits.push({ x: sx / dpr, y: sy / dpr, r: 10, kind: 'port', id: port.id, label: port.name });
+          newHits.push({
+            x: sx / dpr,
+            y: sy / dpr,
+            r: 10,
+            kind: 'port',
+            id: port.id,
+            label: `${port.name} · ${portLocalTime(port.tz, now)}`,
+          });
         }
       }
 

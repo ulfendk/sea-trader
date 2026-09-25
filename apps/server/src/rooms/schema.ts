@@ -25,29 +25,30 @@ export const ShipPub = schema(
     port: t.string(),
     from: t.string(),
     to: t.string(),
-    progressNm: t.number(),
+    progressNm: t.float64(),
     distance: t.number(),
     speed: t.number(),
-    holdUntil: t.number(),
+    holdUntil: t.float64(),
     waiting: t.boolean(),
   },
   'ShipPub',
 );
 export type ShipPub = SchemaType<typeof ShipPub>;
 
-export const NewsItem = schema({ day: t.number(), text: t.string(), kind: t.string() }, 'NewsItem');
+export const NewsItem = schema({ day: t.float64(), text: t.string(), kind: t.string() }, 'NewsItem');
 export type NewsItem = SchemaType<typeof NewsItem>;
 
 export const GameStateSchema = schema(
   {
     gameId: t.string(),
     name: t.string(),
-    day: t.number(),
+    day: t.float64(),
     /** Server wall clock (ms) when `day` was computed, for client-side interpolation. */
-    serverTs: t.number(),
+    serverTs: t.float64(),
+    /** Real instant (ms since epoch, UTC) of game day 0. */
+    startTs: t.float64(),
     status: t.string(),
     timeScale: t.number(),
-    startYear: t.number(),
     durationDays: t.number(),
     fuelIndex: t.number(),
     shipIndex: t.number(),

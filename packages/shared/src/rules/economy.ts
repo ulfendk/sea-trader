@@ -5,14 +5,58 @@ import type { RouteOptions } from '../geo.js';
 
 export const DAY_MS = 86_400_000;
 
-export function gameDate(day: number, startYear: number): Date {
-  return new Date(Date.UTC(startYear, 0, 1) + Math.floor(day * DAY_MS));
+/** Start instant of a game; older saves without `startTs` began on 1 Jan of their start year. */
+export function startTsOf(state: Pick<GameState, 'startTs' | 'settings'>): number {
+  return state.startTs ?? Date.UTC(state.settings.startYear ?? 1990, 0, 1);
 }
 
-export function formatDate(day: number, startYear: number): string {
-  const d = gameDate(day, startYear);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${String(d.getUTCDate()).padStart(2, '0')} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+/** Real-world instant (ms, UTC) of a game day. */
+export function gameTime(startTs: number, day: number): number {
+  return startTs + Math.round(day * DAY_MS);
+}
+
+/**
+ * Formats a game day as a date (and optionally time) in the given IANA time zone.
+ * Without a zone the runtime's local zone is used (the player's own zone in a browser).
+ */
+export function formatGameTime(
+  startTs: number,
+  day: number,
+  opts: { time?: boolean; timeZone?: string } = {},
+): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    ...(opts.time ? { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' as const } : {}),
+    timeZone: opts.timeZone,
+  }).format(new Date(gameTime(startTs, day)));
+}
+
+/** Local clock time (HH:MM) at a port for a given game instant. */
+export function portLocalTime(timeZone: string, ts: number): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone,
+  }).format(new Date(ts));
+}
+
+/** Sub-solar point (where the sun is overhead) for an instant, in degrees. */
+export function subsolarPoint(ts: number): { lon: number; lat: number } {
+  const d = ts / DAY_MS + 2440587.5 - 2451545.0; // days since J2000
+  const g = ((357.529 + 0.98560028 * d) * Math.PI) / 180;
+  const q = 280.459 + 0.98564736 * d;
+  const L = ((q + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * Math.PI) / 180;
+  const e = ((23.439 - 0.00000036 * d) * Math.PI) / 180;
+  const decl = Math.asin(Math.sin(e) * Math.sin(L));
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L));
+  const raDeg = (ra * 180) / Math.PI;
+  const eqTimeMin = 4 * (((((q - raDeg) % 360) + 540) % 360) - 180); // equation of time
+  const utcHours = (((ts % DAY_MS) + DAY_MS) % DAY_MS) / 3_600_000;
+  const lon = ((((-15 * (utcHours - 12 + eqTimeMin / 60) + 180) % 360) + 360) % 360) - 180;
+  return { lon, lat: (decl * 180) / Math.PI };
 }
 
 export function formatMoney(n: number): string {

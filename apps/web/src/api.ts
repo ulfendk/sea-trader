@@ -73,7 +73,8 @@ export interface GameSummary {
   name: string;
   status: string;
   day: number;
-  date: string;
+  /** Current game instant (ms, UTC). */
+  time: number;
   company: string;
   cash: number;
   players: number;

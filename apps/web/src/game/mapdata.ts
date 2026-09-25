@@ -8,6 +8,7 @@ import {
   getShipClass,
   pointAlong,
   routeOptsFor,
+  subsolarPoint,
   type Route,
 } from '@sea-trader/shared';
 import type { PubShip } from '../net';
@@ -116,6 +117,45 @@ export function shipPosition(
   }
   const port = getPort(ship.port);
   return { lon: port.lon, lat: port.lat, heading: 0, atSea: false };
+}
+
+let nightCanvas: HTMLCanvasElement | null = null;
+let nightKey = -1;
+
+/**
+ * Night-side shading for an instant (1 px per 1° cell, scaled up by the map so it stays blocky).
+ * Recomputed at most once per game minute.
+ */
+export function getNightCanvas(ts: number): HTMLCanvasElement {
+  const key = Math.floor(ts / 60_000);
+  if (nightCanvas && key === nightKey) return nightCanvas;
+  const c = nightCanvas ?? document.createElement('canvas');
+  c.width = W;
+  c.height = ROWS;
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(W, ROWS);
+  const sun = subsolarPoint(ts);
+  const r = Math.PI / 180;
+  const sinD = Math.sin(sun.lat * r);
+  const cosD = Math.cos(sun.lat * r);
+  for (let row = 0; row < ROWS; row++) {
+    const lat = (90 - (row + ROW0) - 0.5) * r;
+    for (let x = 0; x < W; x++) {
+      const lon = -180 + x + 0.5;
+      const cosZ = Math.sin(lat) * sinD + Math.cos(lat) * cosD * Math.cos((lon - sun.lon) * r);
+      // Full night below about -6° (civil twilight), a lighter band during twilight.
+      const alpha = cosZ < -0.1 ? 110 : cosZ < 0 ? 55 : 0;
+      const o = (row * W + x) * 4;
+      img.data[o] = 4;
+      img.data[o + 1] = 8;
+      img.data[o + 2] = 32;
+      img.data[o + 3] = alpha;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  nightCanvas = c;
+  nightKey = key;
+  return c;
 }
 
 export { PORTS };

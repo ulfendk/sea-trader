@@ -1,7 +1,7 @@
 import express, { type NextFunction, type Request, type Response, type Router } from 'express';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
-import { DEFAULT_SETTINGS, formatDate, pendingActions, type GameSettings } from '@sea-trader/shared';
+import { DEFAULT_SETTINGS, gameTime, pendingActions, startTsOf, type GameSettings } from '@sea-trader/shared';
 import {
   bearer,
   createSession,
@@ -80,7 +80,6 @@ function cleanSettings(input: unknown): Partial<GameSettings> {
     if (src[k] !== undefined && src[k] !== '' && Number.isFinite(v))
       (out as Record<string, number>)[k] = Math.min(max, Math.max(min, v));
   };
-  num('startYear', 1900, 2100);
   num('timeScale', 0.1, 100000);
   num('startingCash', 0, 1e10);
   num('maxPlayers', 1, 32);
@@ -341,7 +340,7 @@ export function apiRouter(): Router {
           id: g.id,
           name: g.name,
           status: g.status,
-          date: g.date,
+          time: g.time,
           pending: g.pending.length,
         })),
         notifications,
@@ -399,7 +398,8 @@ export function apiRouter(): Router {
           status: st.status,
           createdAt: g.createdAt,
           day: st.day,
-          date: formatDate(st.day, st.settings.startYear),
+          startTs: startTsOf(st),
+          time: gameTime(startTsOf(st), st.day),
           settings: st.settings,
           live: liveRooms.has(g.id),
           clients: liveRooms.get(g.id)?.clients.length ?? 0,

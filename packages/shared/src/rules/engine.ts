@@ -76,11 +76,12 @@ export class Ctx {
   }
 }
 
-export function createGame(seed: number, settings: Partial<GameSettings> = {}): GameState {
+export function createGame(seed: number, settings: Partial<GameSettings> = {}, now = Date.now()): GameState {
   const state: GameState = {
     version: 1,
     seed,
     rng: hashParts(seed, 'rng'),
+    startTs: now,
     day: 0,
     status: 'lobby',
     settings: { ...DEFAULT_SETTINGS, ...settings },
@@ -941,7 +942,9 @@ function newShip(
 
 // ---------------------------------------------------------------- admin / lifecycle
 
-export function startGame(state: GameState) {
+/** Starts (or resumes) a game. A game that has not started yet begins at `now`, the real current time. */
+export function startGame(state: GameState, now = Date.now()) {
+  if (state.status === 'lobby' && state.day === 0) state.startTs = now;
   if (state.status === 'lobby' || state.status === 'paused') state.status = 'running';
 }
 

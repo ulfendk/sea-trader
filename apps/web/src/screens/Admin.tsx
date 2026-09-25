@@ -3,13 +3,13 @@ import { DEFAULT_SETTINGS, formatMoney, type GameSettings } from '@sea-trader/sh
 import { api } from '../api';
 import { toast } from '../toast';
 import { Money, Tabs, Win } from '../ui';
-import { errText } from '../game/util';
+import { errText, localDateTime } from '../game/util';
 
 interface AdminGame {
   id: string;
   name: string;
   status: string;
-  date: string;
+  time: number;
   day: number;
   settings: GameSettings;
   live: boolean;
@@ -46,7 +46,6 @@ const SETTING_FIELDS: [keyof GameSettings, string, string][] = [
     'Time scale (game days per real day)',
     '1 = real time. Use e.g. 1440 (1 day/min) for testing.',
   ],
-  ['startYear', 'Start year', ''],
   ['startingCash', 'Starting cash ($)', ''],
   ['maxPlayers', 'Max players', ''],
   ['actionDeadlineHours', 'Decision deadline (game hours)', 'Default choice is applied after this.'],
@@ -171,7 +170,7 @@ function GamesTab({ games, users, act }: { games: AdminGame[]; users: AdminUser[
               {g.name} — {g.status.toUpperCase()}
             </span>
             <span class="small-text">
-              {g.date} · {g.clients} connected
+              {localDateTime(g.time)} · {g.clients} connected
             </span>
           </div>
           <div class="body col">
@@ -332,6 +331,10 @@ function GamesTab({ games, users, act }: { games: AdminGame[]; users: AdminUser[
             value={{ ...DEFAULT_SETTINGS, ...settings }}
             onChange={(k, v) => setSettings({ ...settings, [k]: v })}
           />
+          <p class="small-text muted" style={{ margin: 0 }}>
+            The game clock starts at the current date and time when you press <b>Start game</b>. Players see
+            times in their own time zone.
+          </p>
           <label class="row">
             <input
               type="checkbox"

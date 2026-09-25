@@ -46,7 +46,8 @@ export interface PubState {
   serverTs: number;
   status: string;
   timeScale: number;
-  startYear: number;
+  /** Real instant (ms, UTC) of game day 0. */
+  startTs: number;
   durationDays: number;
   fuelIndex: number;
   shipIndex: number;

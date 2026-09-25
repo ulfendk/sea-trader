@@ -306,7 +306,7 @@ function CompanyEdit() {
         Save
       </button>
       <p class="small-text muted">
-        Game started {gameDateStr(0)}.{' '}
+        Game started {gameDateStr(0, true)}.{' '}
         {s.durationDays > 0 ? `Ends ${gameDateStr(s.durationDays)}.` : 'Endless game.'} Time runs at{' '}
         {s.timeScale}× real time.
       </p>
