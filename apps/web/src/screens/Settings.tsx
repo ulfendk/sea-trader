@@ -151,10 +151,10 @@ export function Settings() {
         </table>
       </Win>
 
-      <Win title="Omarchy status bar (Waybar)">
+      <Win title="Omarchy status bar">
         <p style={{ marginTop: 0 }}>
-          Create a token for the <code>sea-trader-status</code> Waybar module. It shows how many ships need
-          you and opens the game as a floating window.
+          Create a token for the Sea Trader Omarchy bar widget. It shows how many ships need you and opens the
+          game as a floating window.
         </p>
         <button onClick={newToken}>Create status bar token</button>
         {apiToken && (
