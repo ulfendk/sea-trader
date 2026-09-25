@@ -234,6 +234,8 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
       return best;
     };
     const down = (e: PointerEvent) => {
+      // Let the zoom buttons receive their own clicks; capturing the pointer here would swallow them.
+      if ((e.target as Element | null)?.closest('.map-tools')) return;
       el.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       moved = 0;
@@ -293,10 +295,8 @@ export function WorldMap({ myId, selectedShip, onSelectShip, onSelectPort, highl
   }, []);
 
   const zoom = (f: number) => {
-    const el = wrap.current!;
     const v = view.current;
     v.z = Math.max(1, Math.min(8, v.z * f));
-    void el;
   };
 
   return (
