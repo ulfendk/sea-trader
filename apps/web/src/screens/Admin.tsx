@@ -297,7 +297,7 @@ function GamesTab({ games, users, act }: { games: AdminGame[]; users: AdminUser[
                 ))}
               </tbody>
             </table>
-            <div class="row">
+            <div class={`row ${users.some((u) => !g.members.some((m) => m.id === u.id)) ? '' : 'hidden'}`}>
               <select id={`add-${g.id}`}>
                 {users
                   .filter((u) => !g.members.some((m) => m.id === u.id))

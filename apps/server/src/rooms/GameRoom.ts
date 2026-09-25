@@ -89,7 +89,8 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   }
 
   async onDispose() {
-    liveRooms.delete(this.gameId);
+    if (!this.gameId) return; // game was deleted
+    if (liveRooms.get(this.gameId) === this) liveRooms.delete(this.gameId);
     await this.save();
   }
 
@@ -122,6 +123,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   }
 
   async save() {
+    if (!this.gameId) return;
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = null;
     this.lastSave = Date.now();
