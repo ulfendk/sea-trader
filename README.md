@@ -8,7 +8,7 @@ and pirates, and steer ships into harbour yourself to save the tug fee. Time run
 - **Multiplayer, multi-game.** Run a separate game for each group of friends, all on one server.
 - **Any device.** Username and password login; the same account works on desktop, phone (installable PWA)
   and the Omarchy status bar, all at the same time.
-- **Notifications.** Web Push to phones and desktops, plus a Waybar module with mako notifications on Omarchy.
+- **Notifications.** Web Push to phones and desktops, plus an Omarchy bar widget with desktop notifications.
 - **Admin panel.** Create and configure games (time scale, starting cash, deadlines, length), invite
   players with links, and manage users.
 - **Pixel look** that nods to the original: bitmap fonts, bevelled windows, and a 1° pixel world map.
@@ -19,7 +19,7 @@ and pirates, and steer ships into harbour yourself to save the tug fee. Time run
 packages/shared   game rules: sea routing, economy, charters, events, deterministic mini-games (pure TS, tested)
 apps/server       Node + Colyseus 0.18 (one room per game) + Express REST + Postgres (Drizzle) + Web Push
 apps/web          Preact + Vite PWA: world map, fleet, port office, shipyard, bank, admin panel, mini-games
-integrations/omarchy   Waybar module, floating-window launcher, installer
+integrations/omarchy   Omarchy shell plugin (or Waybar module), floating-window launcher, installer
 deploy/           Portainer stacks (plain and Traefik)
 ```
 

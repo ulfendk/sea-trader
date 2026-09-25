@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "ulfendk.sea-trader",
+  "name": "Sea Trader",
+  "version": "1.0.0",
+  "author": "ulfendk",
+  "description": "Shows how many of your Sea Trader ships need orders, notifies you when a decision comes up, and opens the game as a floating window.",
+  "homepage": "https://github.com/ulfendk/sea-trader",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "Sea Trader",
+    "description": "Ships waiting for orders. Left click opens the game, right click refreshes.",
+    "category": "Games",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "interval": 60
+    },
+    "schema": [
+      {
+        "key": "interval",
+        "type": "integer",
+        "label": "Refresh every",
+        "min": 15,
+        "max": 3600,
+        "step": 15,
+        "defaultValue": 60,
+        "description": "Seconds between status checks. Server URL and token live in ~/.config/sea-trader/config."
+      }
+    ]
+  }
+}

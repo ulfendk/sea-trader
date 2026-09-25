@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Toggles Sea Trader as a floating window on a Hyprland special workspace ("scratchpad").
+# First call launches the web app in its own Chromium profile; later calls show/hide it.
+set -uo pipefail
+
+CONFIG="${SEA_TRADER_CONFIG:-$HOME/.config/sea-trader/config}"
+# shellcheck source=/dev/null
+[[ -r "$CONFIG" ]] && source "$CONFIG"
+URL="${1:-${SEA_TRADER_URL:-}}"
+if [[ -z "$URL" ]]; then
+  notify-send -a "Sea Trader" "Sea Trader is not configured" "Set SEA_TRADER_URL in $CONFIG or run integrations/omarchy/install.sh."
+  exit 1
+fi
+WS="${SEA_TRADER_WORKSPACE:-seatrader}"
+SIZE="${SEA_TRADER_SIZE:-1280 840}"
+PROFILE="${SEA_TRADER_PROFILE:-$HOME/.local/share/sea-trader/browser}"
+# URL the running window was opened with, so a changed config reopens it instead of toggling.
+OPENED="${XDG_CACHE_HOME:-$HOME/.cache}/sea-trader/window-url"
+
+browser="${SEA_TRADER_BROWSER:-}"
+if [[ -z "$browser" ]]; then
+  for b in chromium google-chrome-stable google-chrome brave brave-browser; do
+    command -v "$b" >/dev/null && browser="$b" && break
+  done
+fi
+
+if ! command -v hyprctl >/dev/null; then
+  if [[ -n "$browser" ]]; then exec "$browser" --app="$URL" --user-data-dir="$PROFILE"; else exec xdg-open "$URL"; fi
+fi
+
+# Hyprland with Lua config (Omarchy 4+) takes hl.dsp.* expressions; older releases take the classic
+# dispatcher names, so fall back to those when the Lua form is rejected.
+dispatch() {
+  hyprctl dispatch "$1" >/dev/null 2>&1 || hyprctl dispatch "${@:2}" >/dev/null
+}
+lua_str() { printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\"]/\\&/g')"; }
+
+toggle() {
+  dispatch "hl.dsp.workspace.toggle_special($(lua_str "$WS"))" togglespecialworkspace "$WS"
+}
+
+windows=$(hyprctl clients -j | jq -r --arg ws "special:$WS" '.[] | select(.workspace.name == $ws) | .address')
+
+if [[ -n "$windows" ]]; then
+  if [[ "$(cat "$OPENED" 2>/dev/null)" == "$URL" ]]; then
+    toggle
+    exit 0
+  fi
+  # The window shows another server than the config names now; replace it.
+  for addr in $windows; do
+    dispatch "hl.dsp.window.close({ window = $(lua_str "address:$addr") })" closewindow "address:$addr"
+  done
+  for _ in $(seq 20); do
+    hyprctl clients -j | jq -e --arg ws "special:$WS" 'any(.[]; .workspace.name == $ws)' >/dev/null || break
+    sleep 0.1
+  done
+fi
+
+if [[ -z "$browser" ]]; then
+  notify-send "Sea Trader" "No Chromium-based browser found; opening in the default browser."
+  exec xdg-open "$URL"
+fi
+
+mkdir -p "$PROFILE" "$(dirname "$OPENED")"
+printf '%s\n' "$URL" >"$OPENED"
+# A dedicated profile gives the window its own process, so Hyprland's exec rules apply to it.
+cmd="[workspace special:$WS silent; float; size $SIZE; center] $browser --app=$URL --user-data-dir=$PROFILE --class=sea-trader --no-first-run --no-default-browser-check"
+dispatch "hl.dsp.exec_cmd($(lua_str "$cmd"))" exec "$cmd"
+sleep 0.4
+toggle

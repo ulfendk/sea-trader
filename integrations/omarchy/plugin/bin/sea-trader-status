@@ -1,29 +1,30 @@
 #!/usr/bin/env bash
-# Waybar custom module for Sea Trader.
-# Prints Waybar JSON ({text, tooltip, class}) and raises desktop notifications (mako) for new
+# Status command for Sea Trader, used by the Omarchy shell bar widget (and Waybar on older setups).
+# Prints Waybar-style JSON ({text, tooltip, class}) and raises desktop notifications for new
 # "action needed" events. Config: ~/.config/sea-trader/config (SEA_TRADER_API, SEA_TRADER_TOKEN).
 set -uo pipefail
 
 CONFIG="${SEA_TRADER_CONFIG:-$HOME/.config/sea-trader/config}"
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/sea-trader"
 SEEN="$STATE_DIR/seen"
-ICON="${SEA_TRADER_ICON:-⚓}"
 
 out() { jq -cn --arg text "$1" --arg tooltip "$2" --arg class "$3" '{text: $text, tooltip: $tooltip, class: $class, alt: $class}'; }
 
+ICON="${SEA_TRADER_ICON:-⚓}"
 if ! command -v jq >/dev/null || ! command -v curl >/dev/null; then
   echo '{"text":"⚓ !","tooltip":"sea-trader-status needs curl and jq","class":"offline"}'
   exit 0
 fi
 if [[ ! -r "$CONFIG" ]]; then
-  out "$ICON ?" "Sea Trader is not configured.\nRun integrations/omarchy/install.sh" "offline"
+  out "$ICON ?" "Sea Trader is not configured."$'\n'"Run integrations/omarchy/install.sh" "offline"
   exit 0
 fi
 # shellcheck source=/dev/null
 source "$CONFIG"
+ICON="${SEA_TRADER_ICON:-⚓}"
 
 json=$(curl -fsS --max-time 10 -H "Authorization: Bearer ${SEA_TRADER_TOKEN:-}" "${SEA_TRADER_API%/}/status" 2>/dev/null) || {
-  out "$ICON ×" "Sea Trader server unreachable\n${SEA_TRADER_API:-}" "offline"
+  out "$ICON ×" "Sea Trader server unreachable"$'\n'"${SEA_TRADER_API:-}" "offline"
   exit 0
 }
 
@@ -32,6 +33,9 @@ urgent=$(jq -r '.urgent' <<<"$json")
 
 # Desktop notifications for new action notices.
 mkdir -p "$STATE_DIR"
+# The bar runs one widget per monitor; serialise so each notice is only shown once.
+exec 9>"$STATE_DIR/lock"
+flock -w 5 9 || true
 if [[ ! -f "$SEEN" ]]; then
   jq -r '.notifications[].id' <<<"$json" >"$SEEN"
 else
@@ -43,7 +47,7 @@ else
       (
         action=$(notify-send -a "Sea Trader" -i "anchor" -u normal --action=open="Open game" "⚓ ${game}" "$text" 2>/dev/null)
         [[ "$action" == "open" ]] && "$(dirname "$(readlink -f "$0")")/sea-trader-open"
-      ) &
+      ) </dev/null >/dev/null 2>&1 9>&- &
     fi
   done < <(jq -r --argjson games "$(jq '[.games[] | {(.id): .name}] | add // {}' <<<"$json")" \
     '.notifications[] | select(.action) | [.id, .text, ($games[.gameId] // "Sea Trader")] | @tsv' <<<"$json")

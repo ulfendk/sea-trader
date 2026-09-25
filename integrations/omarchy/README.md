@@ -1,16 +1,19 @@
 # Sea Trader for Omarchy
 
-A Waybar module that shows how many of your ships need orders, sends desktop notifications (mako) when
-a decision comes up, and opens the game as a floating window on a Hyprland special workspace.
+A bar widget that shows how many of your ships need orders, sends desktop notifications when a decision
+comes up, and opens the game as a floating window on a Hyprland special workspace.
 
 ```
-⚓ 3     ← 3 ships need you (yellow); red and blinking when a decision has a deadline
+⚓ 3     ← 3 ships need you (accent colour); red and blinking when a decision has a deadline
 ```
 
 - **Click:** show or hide the floating game window.
 - **Right-click:** refresh now.
 - **Hover:** list of pending actions per game.
 - **Notification "Open game" button:** opens the window.
+
+On Omarchy 4 and later this is an Omarchy shell plugin (`ulfendk.sea-trader`). On older, Waybar-based
+Omarchy releases the installer adds a Waybar module instead.
 
 ## Install
 
@@ -23,17 +26,25 @@ a decision comes up, and opens the game as a floating window on a Hyprland speci
    ```
 
    The installer:
-   - copies `sea-trader-status` and `sea-trader-open` to `~/.local/bin`
-   - writes `~/.config/sea-trader/config` (URL, API URL, token)
-   - adds `custom/sea-trader` to the start of `modules-right` in `~/.config/waybar/config.jsonc` (backup kept
-     as `config.jsonc.bak-sea-trader`) and appends styles to `style.css`
-   - sources `~/.config/hypr/sea-trader.conf` from `hyprland.conf`
-   - restarts Waybar and reloads Hyprland
+   - writes `~/.config/sea-trader/config` (URL, API URL, token) if it does not exist yet
+   - **Omarchy 4+:** copies [`plugin/`](plugin) to `~/.config/omarchy/plugins/ulfendk.sea-trader`, links
+     `sea-trader-status` and `sea-trader-open` into `~/.local/bin`, and enables the widget in the right
+     section of the bar
+   - **Waybar:** copies the scripts to `~/.local/bin`, adds `custom/sea-trader` to the start of
+     `modules-right` in `~/.config/waybar/config.jsonc` (backup kept as `config.jsonc.bak-sea-trader`),
+     appends styles to `style.css` and restarts Waybar
+
+   To skip the prompts, set `SEA_TRADER_URL`, `SEA_TRADER_TOKEN` and optionally `SEA_TRADER_API`
+   (defaults to `<url>/api`) in the environment.
+
+   Re-run the installer after `git pull` to update the plugin. Move the widget with
+   `omarchy bar move ulfendk.sea-trader --section left`, and remove it with
+   `omarchy plugin remove ulfendk.sea-trader`.
 
    Needs `curl`, `jq`, `hyprctl`, `notify-send` and Chromium or another Chromium-based browser. All of these
    ship with Omarchy.
 
-## Manual setup
+## Configuration
 
 `~/.config/sea-trader/config`:
 
@@ -43,16 +54,17 @@ SEA_TRADER_API=https://seatrader.example.com/api
 SEA_TRADER_TOKEN=<token from Settings>
 ```
 
-Add [`waybar-module.jsonc`](waybar-module.jsonc) to your Waybar config and `"custom/sea-trader"` to a module
-list. Then append [`waybar-style.css`](waybar-style.css) to `style.css`.
+The token is kept here rather than in `~/.config/omarchy/shell.json`, so it stays out of dotfile repos. The
+widget's refresh interval (default 60 seconds) can be changed in the bar settings or with
+`omarchy bar set`.
 
 ## How the floating window works
 
 On first click, `sea-trader-open` launches the game with `chromium --app=<url>` using its own profile
-(`~/.local/share/sea-trader/browser`). It uses Hyprland exec rules:
-`[workspace special:seatrader silent; float; size 1280 840; center]`. Later clicks run
-`togglespecialworkspace seatrader`, so the game slides in and out like a scratchpad and keeps running in
-the background. You sign in once in that window; it counts as its own device under Settings.
+(`~/.local/share/sea-trader/browser`) with the exec rules
+`[workspace special:seatrader silent; float; size 1280 840; center]`. Later clicks toggle the
+`seatrader` special workspace, so the game slides in and out like a scratchpad and keeps running in the
+background. You sign in once in that window; it counts as its own device under Settings.
 
 You can override these in the config file:
 
@@ -61,6 +73,10 @@ You can override these in the config file:
 | `SEA_TRADER_BROWSER`   | first of `chromium`, `google-chrome-stable`, `brave` |
 | `SEA_TRADER_SIZE`      | `1280 840`                                           |
 | `SEA_TRADER_WORKSPACE` | `seatrader`                                          |
-| `SEA_TRADER_ICON`      | `⚓`                                                 |
 
-To toggle it from the keyboard, uncomment the `bind` line in `~/.config/hypr/sea-trader.conf`.
+To toggle it from the keyboard on Omarchy 4+, add this to `~/.config/hypr/bindings.lua` (pick a free combo;
+`SUPER ALT + S` is taken by the scratchpad):
+
+```lua
+o.bind("SUPER + CTRL + ALT + S", "Sea Trader", "~/.local/bin/sea-trader-open")
+```
