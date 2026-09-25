@@ -99,7 +99,7 @@ const SETTING_FIELDS: [NumericSetting, string, string][] = [
     'Time scale (game days per real day)',
     '1 = real time. Use e.g. 1440 (1 day/min) for testing.',
   ],
-  ['startingCash', 'Starting cash ($)', ''],
+  ['startingCash', 'Starting cash (€)', ''],
   ['maxPlayers', 'Max players', ''],
   ['actionDeadlineHours', 'Decision deadline (game hours)', 'Default choice is applied after this.'],
   ['durationDays', 'Game length (game days, 0 = endless)', ''],
